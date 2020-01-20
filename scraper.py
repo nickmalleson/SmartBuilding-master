@@ -187,11 +187,16 @@ class Scraper():
             self.building_info)
 
         self.contract_info = Scraper.get_contract_info(self)
+        print("Contract data retrieved successfully")
         self.customer_info = Scraper.get_customer_info(self)
+        print("Customer data retrieved successfully")        
         self.managed_space_info = \
             Scraper.get_managed_space_info(self, building_numbers)
+        print("Managed space data retrieved successfully")
         self.sensor_location_info = Scraper.get_sensor_location_info(self)
+        print("Sensor locations retrieved successfully")
         self.room_info = Scraper.get_room_info(self)
+        print("Room information retrieved successfully")
         
     @staticmethod
     def _login():
@@ -256,17 +261,22 @@ class Scraper():
         
 
     def get_contract_info(self):
-        '''Get all contract info associated with account.'''
-        contract_info = self._call_API("contract")
-        print('Contract info aquired successfully.')
-        return(contract_info)
+        '''Get all contract info associated with account.''' 
+        return(self._call_API("contract"))
 
 
     def get_customer_info(self):
         '''Get all customer info associated with account.'''
-        customerdata = self._call_API("customer")
-        print("Customer data retrieved successfully")
-        return(customerdata)
+        return(self._call_API("customer"))
+    
+    
+    def get_sensor_location_info(self):
+        '''Get all sensor location info associated with your account.'''
+        return(self._call_API("sensorlocation"))
+
+    def get_room_info(self):
+        '''Get all room info associated with your account.'''
+        return(self._call_API("room"))
 
 
 
@@ -327,13 +337,6 @@ class Scraper():
 
         return(managed_space_info)
 
-    def get_sensor_location_info(self):
-        '''Get all sensor location info associated with your account.'''
-        return(self._call_API("sensorlocation"))
-
-    def get_room_info(self):
-        '''Get all room info associated with your account.'''
-        return(self._call_API("room"))
 
 
 def print_attributes(obj):
