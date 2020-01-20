@@ -23,7 +23,7 @@ def get_login_info():
     ''' Get login username and password from locally stored parameter file.'''
 
 
-    parameter_file_path = 'M:/LIDA/SmartBuildingParameters/'
+    parameter_file_path = './SmartBuildingParameters/'
     parameter_file_name = 'SmartBuildingParameters.txt'
     parameter_file = open(parameter_file_path + parameter_file_name)
     params = {}
