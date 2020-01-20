@@ -180,7 +180,7 @@ class Scraper():
     '''
     
     def __init__(self):
-        self.username, self.password, self.building_info = Scraper.login(self)
+        self.username, self.password, self.building_info = Scraper._login(self)
 
         # To get list of building numbers for 'get_managed_space_info()' input.
         building_numbers, _ = get_lists_from_name_key(
@@ -192,8 +192,9 @@ class Scraper():
             Scraper.get_managed_space_info(self, building_numbers)
         self.sensor_location_info = Scraper.get_sensor_location_info(self)
         self.room_info = Scraper.get_room_info(self)
-
-    def login(self):
+        
+    @staticmethod
+    def _login():
         '''Obtain and check username and password for Smart Building API.
 
         Username and password are obtained by user input. These are then check-
