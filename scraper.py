@@ -240,19 +240,19 @@ class Scraper():
         :return: the json returned by the response if successfull (a dict) or
             raise an IOError if the call failed.
         """
-        response = r.get(
-            'https://console.beringar.co.uk/api/beta/{}/'.format(function_name),
-            auth=(self.username, self.password))
+        url = 'https://console.beringar.co.uk/api/beta/{}/'.format(function_name)
+        #print(url)
+        response = r.get(url,auth=(self.username, self.password))
         status_code = response.status_code
 
         # Sucess code = 200, Failed = 400 (simplified).
         if 200 <= status_code < 300:
             # Response as OK.
-            print('\nAPI call successful')
+            #print('\nAPI call successful')
             return response.json()
         # Failed if here
         print('API call failed with code: {}.'.format(status_code ))
-        raise IOError("Call to the API failed")
+        raise IOError("Call to the API failed ({})".format(status_code))
         
 
     def get_contract_info(self):
@@ -297,17 +297,13 @@ class Scraper():
         managed_space_info = []
 
         for i in building_numbers:
-            building_id = self.building_info[i-1]['id']
-
-            urlstr = str(
-                'https://console.beringar.co.uk/api/beta/managedspace/buildin'
-                'g/{0}/' .format(building_id))
-            response = r.get(urlstr, auth=(self.username, self.password))
-            responsecheck = response.status_code
-
-            managed_space_info.append(response.json())
-
-            if 200 <= responsecheck < 400 and managed_space_info[i-1]:
+            # Construct the name of the function to be embedded into the
+            # API URL
+            building_id = self.building_info[i-1]['id']            
+            function_name = 'managedspace/building/{0}'.format(building_id)
+            managed_space_info.append(self._call_API(function_name))
+            
+            try:
                 if len(building_numbers) == 1:
                     print('Managed space info aquired successfully from: {}. '
                           'Output format is: \'managed_space_info'
@@ -316,15 +312,12 @@ class Scraper():
                     managed_space_info = managed_space_info[0]
                     return(managed_space_info)
                 else:
-                    print('Aquired managed space info from: {}.'
-                          .format(self.building_info[i-1]['name']))
-                succ += 1
-            elif not managed_space_info:
-                print('Problem aquiring managed space info from: {}.'
-                      .format(self.building_info[i-1]['name']))
-                fail += 1
-            else:
-                print('Problem connecting to server.')
+                    print('Aquired managed space info from building: '{}'.'
+                              .format(self.building_info[i-1]['name']))
+                    succ += 1
+            except Exception as e:
+                print('Problem aquiring managed space info from: {}. Error: {}'
+                      .format(self.building_info[i-1]['name']), str(e))
                 fail += 1
 
         print('Managed space info aquired from {} building. Successful: {}. '
@@ -336,46 +329,11 @@ class Scraper():
 
     def get_sensor_location_info(self):
         '''Get all sensor location info associated with your account.'''
-
-        response = r.get(
-            "https://console.beringar.co.uk/api/beta/sensorlocation/",
-            auth=(self.username, self.password))
-        responsecheck = response.status_code
-
-        # Deserialize from json format
-        sensor_location_info = response.json()
-
-        # Sucess code = 200, Failed = 400 (simplified)
-        if responsecheck:
-            print('Sensor location info aquired about {} sensor locations.'
-                  .format(
-                      len(sensor_location_info)))
-        else:
-            print('Problem aquiring sensor location info.\n')
-
-        return(sensor_location_info)
+        return(self._call_API("sensorlocation"))
 
     def get_room_info(self):
         '''Get all room info associated with your account.'''
-
-        # Enter username and password and check if response is authorized
-        response = r.get(
-            "https://console.beringar.co.uk/api/beta/room/",
-            auth=(self.username, self.password))
-        responsecheck = response.status_code
-
-        # Deserialize from json format
-        room_info = response.json()
-
-        # Sucess code = 200, Failed = 400 (simplified)
-        if responsecheck:
-            print('Room info aquired successfully about {} rooms.\n'
-                  .format(len(room_info)))
-        else:
-            print('Problem aquiring room info.\n')
-
-        return(room_info)
-
+        return(self._call_API("room"))
 
 
 def print_attributes(obj):
