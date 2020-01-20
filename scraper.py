@@ -180,7 +180,7 @@ class Scraper():
     '''
     
     def __init__(self):
-        self.username, self.password, self.building_info = Scraper._login(self)
+        self.username, self.password, self.building_info = Scraper._login()
 
         # To get list of building numbers for 'get_managed_space_info()' input.
         building_numbers, _ = get_lists_from_name_key(
@@ -231,44 +231,44 @@ class Scraper():
         else:
             print('Page not found or no building associated with account.')
         return(username, password, building_info)
+    
+    def _call_API(self, function_name):
+        """Call the API, inserting 'function_name' into the URL. E.g.:
+            https://console.beringar.co.uk/api/beta/<function_name>/
+        
+        :param function_name: the name of the API function to call
+        :return: the json returned by the response if successfull (a dict) or
+            raise an IOError if the call failed.
+        """
+        response = r.get(
+            'https://console.beringar.co.uk/api/beta/{}/'.format(function_name),
+            auth=(self.username, self.password))
+        status_code = response.status_code
+
+        # Sucess code = 200, Failed = 400 (simplified).
+        if 200 <= status_code < 300:
+            # Response as OK.
+            print('\nAPI call successful')
+            return response.json()
+        # Failed if here
+        print('API call failed with code: {}.'.format(status_code ))
+        raise IOError("Call to the API failed")
+        
 
     def get_contract_info(self):
         '''Get all contract info associated with account.'''
-
-        # enter username and password and check if response is authorized
-        response = r.get(
-            'https://console.beringar.co.uk/api/beta/contract/',
-            auth=(self.username, self.password))
-        responsecheck = response.status_code
-
-        # Sucess code = 200, Failed = 400 (simplified)
-        if responsecheck:
-            print('Contract info aquired successfully.')
-        else:
-            print('Problem aquiring contract data.')
-
-        # Deserialize from json format
-        contract_info = response.json()
+        contract_info = self._call_API("contract")
+        print('Contract info aquired successfully.')
         return(contract_info)
+
 
     def get_customer_info(self):
         '''Get all customer info associated with account.'''
-
-        # enter username and password and check if response is authorized
-        response = r.get(
-            "https://console.beringar.co.uk/api/beta/customer/",
-            auth=(self.username, self.password))
-        responsecheck = response.status_code
-
-        # Sucess code = 200, Failed = 400 (simplified)
-        if responsecheck:
-            print('Customer info aquired succsesfully.')
-        else:
-            print('Problem aquiring customer info.')
-
-        # Deserialize from json format
-        customerdata = response.json()
+        customerdata = self._call_API("customer")
+        print("Customer data retrieved successfully")
         return(customerdata)
+
+
 
     def get_managed_space_info(self, building_numbers):
         ''' Get all managed spaces associated with your account.
