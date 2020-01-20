@@ -322,7 +322,7 @@ class Scraper():
                     managed_space_info = managed_space_info[0]
                     return(managed_space_info)
                 else:
-                    print('Aquired managed space info from building: '{}'.'
+                    print("'Aquired managed space info from building: '{}'."
                               .format(self.building_info[i-1]['name']))
                     succ += 1
             except Exception as e:
