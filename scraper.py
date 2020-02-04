@@ -256,7 +256,8 @@ class Scraper():
             return response.json()
         # Failed if here
         print('API call failed with code: {}.'.format(status_code ))
-        raise IOError("Call to the API failed ({})".format(status_code))
+        raise IOError("Call to the API failed ({}) on url: '{}'".format(
+            status_code, url))
         
 
     def get_contract_info(self):
@@ -310,9 +311,9 @@ class Scraper():
             # API URL
             building_id = self.building_info[i-1]['id']            
             function_name = 'managedspace/building/{0}'.format(building_id)
-            managed_space_info.append(self._call_API(function_name))
-            
+
             try:
+                managed_space_info.append(self._call_API(function_name))
                 if len(building_numbers) == 1:
                     print('Managed space info aquired successfully from: {}. '
                           'Output format is: \'managed_space_info'
@@ -379,27 +380,28 @@ class Scraper():
         fail = 0
         succ = 0
 
+        # TODO: Check logic below makes sense. Nick has changed and not sure.
         for num, i in enumerate(managed_space_numbers, start=0):
             space = self.managed_space_info[i-1]
-            urlstr = str('https://console.beringar.co.uk/api/beta/managedspace/'
-                         'spacelocation/{}/after/{}'
-                         .format(space['id'], timestamp_epoch_millisec))
-            response = r.get(urlstr, auth=(self.username,
-                                           self.password))
-            responsecheck = response.status_code
-            managed_space_nrows_data.append(response.json())
+            function_name = "managedspace/spacelocation/{}/after/{}".format(
+                space['id'], timestamp_epoch_millisec)
 
-            if not managed_space_nrows_data[num]:
-                print('Managed space location number {}: {}. NO DATA RETURNED.'
-                      .format(i, space['name']))
-                fail += 1
-            elif 200 >= responsecheck < 400:
-                print('Managed space location number {}: {}. Successfully aquired'
-                      ' {} rows of data. Input max_rows value: {}.'
-                      .format(i, space['name'], len(managed_space_nrows_data[num]),
-                              timestamp_epoch_millisec))
-                succ += 1
-            else:
+            try:
+                response = self._call_API(function_name)
+                managed_space_nrows_data.append(response.json())
+
+                # TODO: what if this fails, in the next iteration will 'append' and 'num' be out of sync? This happens again in the later functions
+                if not managed_space_nrows_data[num]:
+                    print('Managed space location number {}: {}. NO DATA RETURNED.'
+                          .format(i, space['name']))
+                    fail += 1
+                else:
+                    print('Managed space location number {}: {}. Successfully aquired'
+                          ' {} rows of data. Input max_rows value: {}.'
+                          .format(i, space['name'], len(managed_space_nrows_data[num]),
+                                  timestamp_epoch_millisec))
+                    succ += 1
+            except Exception as e:
                 print('Managed space location number {}: {}. PROBLEM AQUIRING '
                       'DATA.' .format(i, space['name']))
                 fail += 1
@@ -459,30 +461,28 @@ class Scraper():
         '''
         for num, i in enumerate(sensor_numbers, start=0):
             sensor = self.sensor_location_info[i-1]
-            urlstr = str('https://console.beringar.co.uk/api/beta/sensorreading/'
-                         'sensorlocation/{}/after/{}'
-                         .format(sensor['id'], timestamp_epoch_millisec))
-            response = r.get(urlstr, auth=(self.username,
-                                           self.password))
-            responsecheck = response.status_code
-            sensor_reading_after_data.append(response.json())
+            function_name = "sensorreading/sensorlocation/{}/after/{}".format(\
+                            sensor['id'], timestamp_epoch_millisec)
 
-            # Check whether data were returned.
-            if not sensor_reading_after_data[num]:
-                print('Sensor number {}: {}. NO DATA RETURNED.' .format(
-                      sensor_numbers[num], sensor['name']))
-                fail += 1
-            elif 200 >= responsecheck < 400 and sensor_reading_after_data[num]:
-                print('Sensor number {}: {}. Successfully aquired {} readings. '
-                      'Input timestamp_epoch_millisec value: {}.' .format(
-                          sensor_numbers[num], sensor['name'],
-                          len(sensor_reading_after_data[num]),
-                          timestamp_epoch_millisec))
-                succ += 1
-            else:
+            try:
+                response = self._call_API(function_name)
+                sensor_reading_after_data.append(response.json())
+
+                # Check whether data were returned.
+                if not sensor_reading_after_data[num]:
+                    print('Sensor number {}: {}. NO DATA RETURNED.' .format(
+                          sensor_numbers[num], sensor['name']))
+                    fail += 1
+                else:
+                    print('Sensor number {}: {}. Successfully aquired {} readings. '
+                          'Input timestamp_epoch_millisec value: {}.' .format(
+                              sensor_numbers[num], sensor['name'],
+                              len(sensor_reading_after_data[num]),
+                              timestamp_epoch_millisec))
+                    succ += 1
+            except Exception as e:
                 print('Sensor number {}: {}. PROBLEM AQUIRING READING FROM '
-                      'SENSOR.' .format(sensor_reading_after_data[num],
-                                        sensor['name']))
+                      'SENSOR.' .format(sensor_reading_after_data[num], sensor['name']))
                 fail += 1
 
         if isinstance(sensor_numbers, range):
@@ -541,27 +541,25 @@ class Scraper():
         '''
         for num, i in enumerate(sensor_numbers, start=0):
             sensor = self.sensor_location_info[i-1]
-            urlstr = str('https://console.beringar.co.uk/api/beta/sensorreading/'
-                         'sensorlocation/{}/last/{}'
-                         .format(sensor['id'], timestamp_epoch_millisec))
-            response = r.get(urlstr, auth=(self.username,
-                                           self.password))
-            responsecheck = response.status_code
-            sensor_reading_last_data.append(response.json())
+            function_name = "sensorreading/sensorlocation/{}/last/{}".format(
+                sensor['id'], timestamp_epoch_millisec)
+            try:
+                response = self._call_API(function_name)
+                sensor_reading_last_data.append(response.json())
 
-            # Check whether data were returned.
-            if not sensor_reading_last_data[num]:
-                print('Sensor number {}: {}. NO DATA RETURNED.' .format(
-                      sensor_numbers[num], sensor['name']))
-                fail += 1
-            elif 200 >= responsecheck < 400 and sensor_reading_last_data[num]:
-                print('Sensor number {}: {}. Successfully aquired {} readings. '
-                      'Input timestamp_epoch_millisec value: {}.' .format(
-                          sensor_numbers[num], sensor['name'],
-                          len(sensor_reading_last_data[num]),
-                          timestamp_epoch_millisec))
-                succ += 1
-            else:
+                # Check whether data were returned.
+                if not sensor_reading_last_data[num]:
+                    print('Sensor number {}: {}. NO DATA RETURNED.' .format(
+                          sensor_numbers[num], sensor['name']))
+                    fail += 1
+                else:
+                    print('Sensor number {}: {}. Successfully aquired {} readings. '
+                          'Input timestamp_epoch_millisec value: {}.' .format(
+                              sensor_numbers[num], sensor['name'],
+                              len(sensor_reading_last_data[num]),
+                              timestamp_epoch_millisec))
+                    succ += 1
+            except Exception as e:
                 print('Sensor number {}: {}. PROBLEM AQUIRING READING FROM '
                       'SENSOR.' .format(sensor_reading_last_data[num],
                                         sensor['name']))
