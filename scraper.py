@@ -22,8 +22,8 @@ import sys
 def get_login_info():
     ''' Get login username and password from locally stored parameter file.'''
 
-
-    parameter_file_path = './SmartBuildingParameters/'
+    # Look in the folder in the directory above the present working directory
+    parameter_file_path = '../SmartBuildingParameters/'
     parameter_file_name = 'SmartBuildingParameters.txt'
     parameter_file = open(parameter_file_path + parameter_file_name)
     params = {}
@@ -409,7 +409,7 @@ class Scraper():
             managed_spaces = managed_space_numbers.copy()
 
         print('Data aquired from', succ + fail,
-              'managed space locations. Succesful: {}. Failed: {}.\n'
+              'managed space location(s). Succesful: {}. Failed: {}.\n'
               .format(succ, fail))
 
         return(managed_space_nrows_data, managed_spaces)
@@ -489,7 +489,7 @@ class Scraper():
             sensor_numbers = list(sensor_numbers)
         sensor_list = sensor_numbers.copy()
 
-        print("Aquired data from {} sensors. Succsessful: {}. Failed: {}.\n"
+        print("Aquired data from {} sensor(s). Succsessful: {}. Failed: {}.\n"
               .format(num+1, succ, fail))
 
         return(sensor_reading_after_data, sensor_list)
@@ -569,7 +569,7 @@ class Scraper():
             sensor_numbers = list(sensor_numbers)
         sensor_list = sensor_numbers.copy()
 
-        print("Aquired data from {} sensors. Succsessful: {}. Failed: {}.\n"
+        print("Aquired data from {} sensor(s). Succsessful: {}. Failed: {}.\n"
               .format(num+1, succ, fail))
 
         return(sensor_reading_last_data, sensor_list)
