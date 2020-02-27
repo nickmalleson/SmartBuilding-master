@@ -17,7 +17,13 @@ import matplotlib.dates as mdates
 import pandas as pd
 import requests as r  # required to acesss API
 import sys
+import time
+import datetime as dt
 
+def time_now():
+    ''' Get the current time as ms time epoch'''
+    return(int(round(time.time() * 1000)))
+    
 
 def get_login_info():
     ''' Get login username and password from locally stored parameter file.'''
@@ -235,7 +241,7 @@ class Scraper():
         else:
             print('Page not found or no building associated with account.')
         return(username, password, building_info)
-    
+
     def _call_API(self, function_name):
         """Call the API, inserting 'function_name' into the URL. E.g.:
             https://console.beringar.co.uk/api/beta/<function_name>/
@@ -244,7 +250,7 @@ class Scraper():
         :return: the json returned by the response if successfull (a dict) or
             raise an IOError if the call failed.
         """
-        url = 'https://console.beringar.co.uk/api/beta/{}/'.format(function_name)
+        url = 'https://console.beringar.co.uk/api/beta/{}'.format(function_name)
         #print(url)
         response = r.get(url,auth=(self.username, self.password))
         status_code = response.status_code
@@ -277,7 +283,6 @@ class Scraper():
     def get_room_info(self):
         '''Get all room info associated with your account.'''
         return(self._call_API("room"))
-
 
 
     def get_managed_space_info(self, building_numbers):
@@ -338,7 +343,7 @@ class Scraper():
         return(managed_space_info)
 
 
-    def managed_space_nrows(self,
+    def managed_space_after(self,
                             managed_space_numbers=None,
                             timestamp_epoch_millisec=1000):
         ''' Get last ‘max_rows’ of managed space readings for a given managed
@@ -351,7 +356,9 @@ class Scraper():
             choose_by_number(self.managed_space_info, 'managed space')
             to get corresponding numbers.
         timestamp_epoch_millisec: int
-            Desired number of rows.
+            A time in ms epoch. Returns data from this time and includes up to
+            1000 time points (one per minute). Default 1000 (will return data 
+            earliest data availble)
 
         Returns
         -------
@@ -376,6 +383,13 @@ class Scraper():
                    for i in all_managed_spaces_numbers):
             sys.exit('\nBad index in input list.')
 
+        # Convert input time to ISO format
+        input_time = \
+            dt.datetime.utcfromtimestamp(int(timestamp_epoch_millisec/1000)).isoformat()
+
+        print('Ms time epoch used for input: {}. Input in ISO format: {}'
+                          .format(timestamp_epoch_millisec, input_time))
+
         managed_space_nrows_data = []
         fail = 0
         succ = 0
@@ -388,7 +402,7 @@ class Scraper():
 
             try:
                 response = self._call_API(function_name)
-                managed_space_nrows_data.append(response.json())
+                managed_space_nrows_data.append(response)
 
                 # TODO: what if this fails, in the next iteration will 'append' and 'num' be out of sync? This happens again in the later functions
                 if not managed_space_nrows_data[num]:
@@ -397,13 +411,12 @@ class Scraper():
                     fail += 1
                 else:
                     print('Managed space location number {}: {}. Successfully aquired'
-                          ' {} rows of data. Input max_rows value: {}.'
-                          .format(i, space['name'], len(managed_space_nrows_data[num]),
-                                  timestamp_epoch_millisec))
+                          ' {} rows of data.'
+                          .format(i, space['name'], len(managed_space_nrows_data[num])))
                     succ += 1
             except Exception as e:
                 print('Managed space location number {}: {}. PROBLEM AQUIRING '
-                      'DATA.' .format(i, space['name']))
+                      'DATA. {}' .format(i, space['name'],e))
                 fail += 1
 
             managed_spaces = managed_space_numbers.copy()
@@ -427,7 +440,9 @@ class Scraper():
             choose_by_number(self.sensor_location_info, 'sensor')
             to get corresponding numbers.
         timestamp_epoch_millisec: int
-            Desired number of rows. Max = 1000.
+            A time in ms epoch. Returns data from this time and includes up to
+            1000 time points (one per minute). Default 1000 (will return data 
+            earliest data availble)
 
         Returns
         -------
@@ -452,6 +467,13 @@ class Scraper():
         if not any(i in sensor_numbers for i in all_sensor_numbers):
             sys.exit('\nBad index in input list.')
 
+        # Convert input time to ISO format
+        input_time = \
+            dt.datetime.utcfromtimestamp(int(timestamp_epoch_millisec/1000)).isoformat()
+
+        print('Ms time epoch used for input: {}. Input in ISO format: {}'
+                          .format(timestamp_epoch_millisec, input_time))
+
         sensor_reading_after_data = []
         succ = 0
         fail = 0
@@ -466,7 +488,7 @@ class Scraper():
 
             try:
                 response = self._call_API(function_name)
-                sensor_reading_after_data.append(response.json())
+                sensor_reading_after_data.append(response)
 
                 # Check whether data were returned.
                 if not sensor_reading_after_data[num]:
@@ -475,10 +497,8 @@ class Scraper():
                     fail += 1
                 else:
                     print('Sensor number {}: {}. Successfully aquired {} readings. '
-                          'Input timestamp_epoch_millisec value: {}.' .format(
-                              sensor_numbers[num], sensor['name'],
-                              len(sensor_reading_after_data[num]),
-                              timestamp_epoch_millisec))
+                          .format(sensor_numbers[num], sensor['name'],
+                                  len(sensor_reading_after_data[num]))
                     succ += 1
             except Exception as e:
                 print('Sensor number {}: {}. PROBLEM AQUIRING READING FROM '
@@ -545,7 +565,7 @@ class Scraper():
                 sensor['id'], timestamp_epoch_millisec)
             try:
                 response = self._call_API(function_name)
-                sensor_reading_last_data.append(response.json())
+                sensor_reading_last_data.append(response)
 
                 # Check whether data were returned.
                 if not sensor_reading_last_data[num]:
