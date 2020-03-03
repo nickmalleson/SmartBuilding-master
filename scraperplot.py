@@ -20,15 +20,12 @@ choices = input('What do you want to plot? Press enter for all. \n1. Managed '
 if not choices:
     chosen_space_numbers, chosen_space_names = \
         scrp.choose_by_number(scraper.managed_space_info, 'Managed space')
-    scrp.plot_managed_spaces(scraper_instance=scraper,
-                            managed_spaces=chosen_space_numbers)
+    scraper.plot_managed_spaces(managed_spaces=chosen_space_numbers)
 
     chosen_location_numbers, chosen_location_names = \
         scrp.choose_by_number(scraper.sensor_location_info, 'Sensor location')
-    scrp.plot_sensor_reading_after(scraper_instance=scraper,
-                                  sensor_numbers=chosen_location_numbers)
-    scrp.plot_sensor_reading_last(scraper_instance=scraper,
-                                 sensor_numbers=chosen_location_numbers)
+    scraper.plot_sensor_reading_after(sensor_numbers=chosen_location_numbers)
+
 elif choices:
 
     choices = eval(choices)
@@ -37,17 +34,12 @@ elif choices:
         chosen_space_numbers, chosen_space_names = \
             scrp.choose_by_number(scraper.managed_space_info, 'Managed space')
 
-        # NEED TO UPDATE THESE FUNCTIONS TO ta
-        scrp.plot_managed_spaces(scraper_instance=scraper,
-                                managed_spaces=chosen_space_numbers)
+        scraper.plot_managed_spaces(managed_spaces=chosen_space_numbers)
     elif choices == 2:
         chosen_location_numbers, chosen_location_names = \
             scrp.choose_by_number(scraper.sensor_location_info,
                                  'Sensor location')
 
-        scrp.plot_sensor_reading_after(scraper_instance=scraper,
-                                      sensor_numbers=chosen_location_numbers)
-        scrp.plot_sensor_reading_last(scraper_instance=scraper,
-                                     sensor_numbers=chosen_location_numbers)
+        scraper.plot_sensor_reading_after(sensor_numbers=chosen_location_numbers)
 else:
     print('Unknown input.')
