@@ -898,9 +898,9 @@ class Scraper():
                             paramlabels.append(label)
                     del paramlabels[10], paramlabels[9], paramlabels[0]
                     plotlabels = ['Occupancy\n(n)', 'VOC\n(ppm?)', 'CO2\n(ppm?)',
-                                  'Temperature\n(°C)', 'Pressure\n(mbars??)',
-                                  'Humidity\n(RH??)', 'Light Intensity\n(lux)',
-                                  'Noise Levels\n(dB??)']
+                                  'Temperature\n(°C)', 'Pressure\n(mBar)',
+                                  'Humidity\n(RH)', 'Light Intensity\n(lux)',
+                                  'Noise Levels\n(dB)']
 
                 current_dataframe = pd.DataFrame(data)
                 current_dataframe['rxtimestamputc'] =\
