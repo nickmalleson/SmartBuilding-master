@@ -1,4 +1,6 @@
 --Create the database used for the real-time building data analysis
+-- You can use this to create a database using the following command on the command-line:
+--     sqlite3 database.db < create_database.sql 
 
 -- First turn foreign key constraints on (this is SQLite specific, in most RDMS's this is on by default)
 PRAGMA foreign_keys = ON;

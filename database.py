@@ -57,11 +57,10 @@ for i, j in zip(sensor_reading_latest_data, all_sensor_numbers):
         if not i:
             print('No data returned for sensor {}.'.format(j))
             continue 
-        c.execute('INSERT INTO sensor_readings (time, sensor_id, sensor_number, sensor_name, co2, humidity, '\
+        c.execute('INSERT INTO sensor_readings (time, sensor_number, sensor_name, co2, humidity, '\
                   'lux, noise, occupancy, pressure, sensorlocation, temperature, timestamputc, voc) '\
-                  'VALUES(strftime(?,?),?,?,?,?,?,?,?,?,?,?,?,?,?)', \
+                  'VALUES(strftime(?,?),?,?,?,?,?,?,?,?,?,?,?,?)', \
                   ['%s','now', \
-                   smart_building.sensor_location_info[j-1]['id'], \
                    j, \
                    smart_building.sensor_location_info[j-1]['name'], \
                    i['co2'], i['humid'], i['lux'], i['noise'], i['occupancy'], i['pressure'], \
