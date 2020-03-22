@@ -6,6 +6,13 @@ bin-release/
 
 # Other files and folders
 .settings/
+.idea
+database.db
+__pycache__
+.DS_Store
+*.swp
+.ipynb_checkpoints
+.spyproject
 
 # Executables
 *.swf
