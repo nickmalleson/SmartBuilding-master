@@ -19,13 +19,15 @@ import requests as r  # required to acesss API
 import sys
 import time
 import datetime as dt
+from dateutil.parser import parse
 
 
+#%%
 def time_now():
     ''' Get the current time as ms time epoch'''
     return(int(round(time.time() * 1000)))
 
-
+#%%
 def make_empty_list(length):
     ''' Returns an empty list of length 'length'''
     list_for_output = []
@@ -33,7 +35,7 @@ def make_empty_list(length):
         list_for_output.append([])
     return(list_for_output)
 
-
+#%%
 def get_login_info():
     ''' Get login username and password from locally stored parameter file.'''
 
@@ -50,88 +52,22 @@ def get_login_info():
     password = params['password']
     return(username, password)
 
-
-def get_key_names_and_values(key_string, list_of_dicts):
-    ''' Returns lists of values and corresponding numbers of given key.
-
-    Parameters
-    ----------
-    key_string: str
-        The desired key from a dictionary.
-    list_of_dicts: dict
-        Dictionary or list of dictionaries.
-
-    Returns
-    -------
-    value_nums: list of ints
-        Index in dictionary + 1
-    value_strings: list of strings
-        Corresponding names.
-    '''
-
-    value_nums = []
-    value_strings = []
-
-    for num, dictionary in enumerate(list_of_dicts):
-        value_nums.append(num+1)
-        value_strings.append(dictionary[key_string])
+#%%
+def get_values_and_indexes(dataframe, column_name='name'):
+    ''' Returns lists of values from coloumn_name in dataframe and corresponding index numbers.'''
+    
+    value_nums = list(dataframe.index)
+    value_strings = list(dataframe[column_name])
     return(value_nums, value_strings)
 
-
-def print_key_names_and_values(key_string, key_nums, key_values):
-    ''' Prints lists of values and corresponding numbers of given key.
-
-    Parameters
-    ----------
-    key_string: str
-        A short description of values (e.g. 'Building').
-    value_nums: list of ints
-        'value_nums' output from get_key_names_and_values().
-    value_strings: list of strings
-        Dictionary or list of dictionaries.
-
-    Returns
-    -------
-    value_nums: list of ints
-        Index in dictionary + 1
-    '''
-
-    for num, value in zip(key_nums, key_values):
-        print('{} number {}: {}.'.format(key_string, num, value))
-
-
-def get_lists_from_name_key(list_of_dicts):
-    ''' Get lists of numbers and corresponding key 'names' from a list of 
-    dicts.
+#%%
+def choose_by_number(dataframe):
+    ''' Takes user input to choose from a list using the index column name.
 
     Parameters
     ----------
-    list_of_dicts: list of dictionaries
-        The list of dictionaries from the Scraper() object 
-        (e.g. scraper.room_info) from which to obtain a list of 'name' keys.
-
-    Returns
-    -------
-    list_of_numbers: list of ints
-        List of numbers corresponding to the names in 'list_of_names'.
-    list_of_names: list of strings
-        List of names corresponding to the numbers in 'list_of_numbers.
-    '''
-
-    list_of_numbers, list_of_names = get_key_names_and_values('name',
-                                                              list_of_dicts)
-    return(list_of_numbers, list_of_names)
-
-
-def choose_by_number(list_of_dicts, list_description):
-    ''' Takes user input to choose from a list.
-
-    Parameters
-    ----------
-    list_of_dicts: list of dictionaries
-        The list of dictionaries from the Scraper() object 
-        (e.g. scraper.room_info) from which to obtain a list using the key: 
-        'name'.
+    dataframe: panda dataframe
+        The dataframe from the Scraper() object (e.g. scraper.room_info) from which to choose.
 
     Returns
     -------
@@ -140,8 +76,8 @@ def choose_by_number(list_of_dicts, list_description):
     chosen_names: list of strings
         List of names corresponding to chosen numbers.
     '''
-
-    list_of_numbers, list_of_names = get_lists_from_name_key(list_of_dicts)
+    list_description=dataframe.index.name
+    list_of_numbers, list_of_names = get_values_and_indexes(dataframe)
 
     if len(list_of_numbers) == 1:
         chosen_numbers = list_of_numbers
@@ -153,14 +89,13 @@ def choose_by_number(list_of_dicts, list_description):
         return(chosen_numbers, chosen_names)
 
     print("\nAvailable:")
-    for number, name in zip(list_of_numbers,
-                            list_of_names):
+    for number, name in zip(list_of_numbers, list_of_names):
         print("{} {}: {}.".format(list_description, number, name))
 
     chosen_numbers = input(
         'Choose by number. Use the format:\n \'1\' for single, \'1, 2, 3\''
-        'for multiple, or press enter for all.\n Use \'range()\' to return a'
-        'list (e.g.\'range(3,6)\' returns \'3,4,5\'):')
+        'for multiple, or press enter for all.\n Use \'range()\' to return a '
+        'list (e.g.\'range(3,6)\' returns \'3,4,5\'):\n>>')
 
     if not chosen_numbers:
         chosen_numbers = list_of_numbers
@@ -179,38 +114,34 @@ def choose_by_number(list_of_dicts, list_description):
             if number not in list_of_numbers or number <= 0:
                 sys.exit('\nBad index number {}.' .format(number))
             else:
-                chosen_names.append(list_of_names[number-1])
+                chosen_names.append(list_of_names[list_of_numbers.index(number)])
 
     print('\nChosen:')
     for (number, name) in zip(chosen_numbers, chosen_names):
         print('{} {}: {}.'.format(list_description, number, name))
-    print('\n')
 
     return(chosen_numbers, chosen_names)
 
-
+#%%
 class Scraper():
     '''Obtains login details and stores data associated with the account in co-
     stant variables.
     '''
 
-    def __init__(self):
-        self.username, self.password, self.building_info = Scraper._login()
+    def __init__(self, login=True):
+                    
+            self.username, self.password, self.building_info = Scraper._login()
 
-        # To get list of building numbers for 'get_managed_space_info()' input.
-        building_numbers, _ = get_lists_from_name_key(self.building_info)
-
-        # TODO: should all these functions also return a list of corresponding numbers?
-        self.contract_info = self.get_contract_info()
-        print("Contract data retrieved successfully")
-        self.customer_info = self.get_customer_info()
-        print("Customer data retrieved successfully")
-        self.managed_space_info = self.get_managed_space_info(building_numbers)
-        print("Managed space data retrieved successfully")
-        self.sensor_location_info = self.get_sensor_location_info()
-        print("Sensor locations retrieved successfully")
-        self.room_info = self.get_room_info()
-        print("Room information retrieved successfully")
+            self.contract_info = self.get_contract_info()
+            print("Contract data retrieved successfully.")
+            self.customer_info = self.get_customer_info()
+            print("Customer data retrieved successfully.")
+            self.managed_space_info = self.get_managed_space_info()
+            print("Managed space data retrieved successfully.")
+            self.sensor_location_info = self.get_sensor_location_info()
+            print("Sensor locations retrieved successfully.")
+            self.room_info = self.get_room_info()
+            print("Room information retrieved successfully.")
 
     @staticmethod
     def _login():
@@ -225,7 +156,7 @@ class Scraper():
 
         # Prompt to enter username or press enter to use saved details
         username = input(
-            "Enter username or press enter to log in as 'yanjiedong':")
+            "Enter username or press enter to log in as 'yanjiedong':\n>>")
 
         # if enter was pressed use saved username and password
         if username == '':
@@ -243,10 +174,16 @@ class Scraper():
 
         # Sucess code = 200, Failed = 400 (simplified).
         if 200 <= responsecheck < 300:
+            
             # Obtain building name from response
-            building_info = response.json()
-            print('\nLogin successful.\nBuilding info aquired successfully '
-                  'from {}.' .format(building_info[0]['name']))
+            building_info = pd.DataFrame(response.json())            
+            building_info['buildingnumber'] = list(range(1,len(building_info)+1))
+            building_info = building_info.set_index('buildingnumber')
+            
+            print('Login successful.\nBuilding info aquired successfully '\
+                  'from {} building(s). First building: {}.' 
+                  .format(len(building_info), building_info['name'].loc[1]))
+
         else:
             print('Page not found or no building associated with account.')
         return(username, password, building_info)
@@ -256,8 +193,8 @@ class Scraper():
             https://console.beringar.co.uk/api/<function_name>/
 
         :param function_name: the name of the API function to call
-        :return: the json returned by the response if successfull (a dict) or
-            raise an IOError if the call failed.
+        :return: the json returned by the response if successfull (converted 
+        from a dict to a dataframe) or raise an IOError if the call failed.
         """
         url = 'https://console.beringar.co.uk/api/{}'.format(function_name)
         # print(url)
@@ -267,8 +204,14 @@ class Scraper():
         # Sucess code = 200, Failed = 400 (simplified).
         if 200 <= status_code < 300:
             # Response as OK.
-            #print('\nAPI call successful')
-            return response.json()
+            if response.json():
+                response_df = pd.DataFrame(pd.DataFrame(response.json()))
+                response_df['number'] = list(range(1,len(response_df)+1))
+                response_df = response_df.set_index('number')
+            else:
+                response_df = response.json()
+        return response_df
+        
         # Failed if here
         print('API call failed with code: {}.'.format(status_code))
         raise IOError("Call to the API failed ({}) on url: '{}'".format(
@@ -276,492 +219,356 @@ class Scraper():
 
     def get_contract_info(self):
         '''Get all contract info associated with account.'''
-        return(self._call_API("contract"))
+        contract_info = self._call_API("contract")
+        contract_info.index.name = "contractnumber"
+        return(contract_info)
 
     def get_customer_info(self):
         '''Get all customer info associated with account.'''
-        return(self._call_API("customer"))
+        customer_info = self._call_API("customer")
+        customer_info.index.name = "customernumber"
+        return(customer_info)
 
     def get_sensor_location_info(self):
         '''Get all sensor location info associated with your account.'''
-        return(self._call_API("sensorlocation"))
+        sensor_location_info = self._call_API("sensorlocation")
+        sensor_location_info.index.name = "sensornumber"
+        return(sensor_location_info)
 
     def get_room_info(self):
         '''Get all room info associated with your account.'''
-        return(self._call_API("room"))
+        room_info = self._call_API("room")
+        room_info.index.name = "roomnumber"
+        return(room_info)
+        
 
-    def get_managed_space_info(self, building_numbers=1):
-        ''' Get all managed spaces associated with your account.
-
-        Parameters
-        ----------
-        building_numbers: int, or list of ints
-            Integer or list of integers corresponding to a building number
-            from the output of:
-            building_numbers, _ = get_lists_from_name_key(self.building_info)
-
-        Returns
-        -------
-        managed_space_info: list of dictionaries (if one building in list), or
-            list of list of dictionaries (if >1 building in list_of_building_n-
-            umbers).
+    def get_managed_space_info(self, building_number=1):
+        ''' Get all managed spaces associated with your account. Requires building
+        number from self.building_info - default = 1.
         '''
 
-        if isinstance(building_numbers, int):
-            building_numbers = [building_numbers]
-
-        # To count successful and failed retrievals
-        succ = 0
-        fail = 0
-
-        managed_space_info = []
-
-        for i in building_numbers:
-            # Construct the name of the function to be embedded into the
-            # API URL
-            building_id = self.building_info[i-1]['id']
-            function_name = 'managedspace/building/{0}'.format(building_id)
-
-            try:
-                managed_space_info.append(self._call_API(function_name))
-                if len(building_numbers) == 1:
-                    print('Managed space info aquired successfully from: {}. '
-                          'Output format is: \'managed_space_info'
-                          '[a]\', where \'a\' is the first space.'
-                          .format(self.building_info[i-1]['name']))
-                    managed_space_info = managed_space_info[0]
-                    return(managed_space_info)
-                else:
-                    print("'Aquired managed space info from building: '{}'."
-                          .format(self.building_info[i-1]['name']))
-                    succ += 1
-            except Exception as e:
-                print('Problem aquiring managed space info from: {}. Error: {}'
-                      .format(self.building_info[i-1]['name']), str(e))
-                fail += 1
-
-        print('Managed space info aquired from {} building. Successful: {}. '
-              'Failed: {}.\nOutput format is: \'managed_space_info[b][a]\', '
-              'where \'b\' is the building and \"a\" is the space.' .format(
-                  succ + fail, succ, fail))
-
+        building_id = self.building_info['id'].loc[building_number]
+        function_name = 'managedspace/building/{0}'.format(building_id)
+        managed_space_info = self._call_API(function_name)
+        managed_space_info.index.name = "spacenumber"
         return(managed_space_info)
 
+
+#%%
     def managed_space_after(self,
                             managed_space_numbers=None,
                             timestamp_epoch_millisec=None):
-        ''' Get last ‘max_rows’ of managed space readings for a given managed
-        space.
+        ''' Get sensor readings (max 1000) for all, or a given managed space, after a specified 
+        time point. No inputs returns data from all using timestamp from 1100 minutes ago.
 
         Parameters
         ----------
         managed_space_numbers: int/list of ints
-            Single number or list. Use:
-            choose_by_number(self.managed_space_info, 'managed space')
-            to get corresponding numbers.
+            Single number or list of numbers corresponding to managed spaces. Use: 
+            'chosen_numbers, chosen_names = choose_by_number(self.managed_space_info)'
+            to get a list of numbers corresponding to space names.
         timestamp_epoch_millisec: int
-            A time in ms epoch. Returns data from this time and includes up to
-            1000 time points (one per minute). Default 1100 (will usually return 
-            1000 rows of data for each available sensor).
+            A time in ms epoch. Returns data from this time and includes up to 1000 time points 
+            (one per minute). Default 1100 (usually returns 1000 rows for each available sensor).
 
         Returns
         -------
-        managed_space_after_data: list of list of dictionaries. Each index will co-
-            rrelate to the managed space number in the same index in 'managed_spac-
-            e_list'.
+        managed_space_after_data: list of dataframes
+            Data from responding sensors. Non-responding sensors are not included. 
+            Data in managed_space_after_data[x] is from the space number in managed_spaces[x].            
+            The 'spacenumber' column in each managed_space_after_data index also corresponds to 
+            the relevant index in self.managed_space_info.
         managed_spaces: list of ints
-            The same as 'managed_space_numbers'.
+            List of responding sensors that returned data. The number in each element corresponds 
+            to a spacenumber index in self.managed_space_info.
 
         '''
-        all_managed_spaces_numbers = \
-            list(range(1, len(self.managed_space_info)+1))
+        all_managed_space_numbers = list(self.managed_space_info.index)
 
         if isinstance(managed_space_numbers, int):
             managed_space_numbers = [managed_space_numbers]
 
         if managed_space_numbers is None:
-            managed_space_numbers = \
-                all_managed_spaces_numbers
+            managed_space_numbers = all_managed_space_numbers
 
-        if not any(i in managed_space_numbers
-                   for i in all_managed_spaces_numbers):
-            sys.exit('\nBad index in input list.')
+        for i in managed_space_numbers: 
+            if i not in all_managed_space_numbers: 
+                sys.exit('\nBad index in input list: {}. Check self.managed_space_info for list.'
+                         .format(str(i)))
 
-        """ Default time is 1100 minutes from when call was made. This is usually
-        enough to get 1000 data points for each sensor. """
+        ''' Default time is 1100 minutes from when call was made. This is usually
+        enough to get 1000 data points for each sensor. '''
         if timestamp_epoch_millisec is None:
-            timestamp_epoch_millisec = time_now()-66000000
+            ##TODO: UNCOMMENT NEXT LINE, DELETE LINE BELOW
+            # timestamp_epoch_millisec = time_now()-66000000
+            timestamp_epoch_millisec = 1583243183
 
         # Convert input time to ISO format
-        input_time = \
-            dt.datetime.utcfromtimestamp(
-                int(timestamp_epoch_millisec/1000)).isoformat()
+        input_time = dt.datetime.utcfromtimestamp(int(timestamp_epoch_millisec/1000)).isoformat()
 
-        print('Ms time epoch used for input: {}. Input in ISO format: {}'
+        print('\nGetting managed space after data.\nMs time epoch used for input: {}. Input in ISO format: {}.'
               .format(timestamp_epoch_millisec, input_time))
 
         managed_space_after_data = []
+        managed_spaces = []
         fail = 0
         succ = 0
-
-        for num, i in enumerate(managed_space_numbers, start=0):
-            space = self.managed_space_info[i-1]
-            function_name = "beta/managedspace/spacelocation/{}/after/{}".format(
-                space['id'], timestamp_epoch_millisec)
+        
+        # enumerate because input_num and i are not necessarily related
+        for input_num, space_num in enumerate(managed_space_numbers, start=0):
+            space = self.managed_space_info.loc[space_num]
+            function_name = "beta/managedspace/spacelocation/{}/after/{}"\
+            .format(space['id'], timestamp_epoch_millisec)
 
             try:
                 response = self._call_API(function_name)
-                managed_space_after_data.append(response)
-
-                if not managed_space_after_data[num]:
-                    print('Managed space location number {}: {}. NO DATA RETURNED.'
-                          .format(i, space['name']))
-                    fail += 1
-                else:
-                    print('Managed space location number {}: {}. Successfully aquired'
-                          ' {} rows of data.'
-                          .format(i, space['name'], len(managed_space_after_data[num])))
-                    succ += 1
             except Exception as e:
-                print('Managed space location number {}: {}. PROBLEM AQUIRING '
-                      'DATA. Error: {}' .format(i, space['name'], str(e)))
+                print('Managed space number {}: {}. PROBLEM AQUIRING '
+                      'DATA. Error: {}' .format(space_num, space['name'], str(e)))
                 fail += 1
 
-            managed_spaces = managed_space_numbers.copy()
-
-        print('Data aquired from {} managed space location(s). Succesful: {}. Failed: {}.\n'
-              .format(succ + fail, succ, fail))
+            if not isinstance(response, pd.core.frame.DataFrame):
+                print('Managed space number {}: {}. NO DATA RETURNED.'
+                      .format(space_num, space['name']))
+                fail += 1
+            else:
+                response['spacenumber'] = space_num 
+                managed_space_after_data.append(response)
+                managed_spaces.append(space_num)
+                print('Managed space number {}: {}. Successfully aquired'
+                      ' {} rows of data.'
+                      .format(space_num, space['name'], len(managed_space_after_data[-1])))
+                succ += 1
+        print('Data successfully aquired from {} of {} possible managed space(s).'
+              .format(succ, succ + fail))
 
         return(managed_space_after_data, managed_spaces)
 
-    def managed_space_latest(self, building_numbers=1):
-        ''' Get latest sensor reading from managed spaces readings for a given building. 
-        Since the API call returns a list which excludes non-responsive sensors, this 
-        function builds a list of all sensors from self.managed_space_info and leaves empty
-        indexes when sensors are unresponsive.
-
-        Parameters
-        ----------
-        building_numbers: int/list of ints
-            Single number or list. Use:
-            managed_space_numbers, _ = choose_by_number(self.building_info, 'managed space')
-            to get corresponding numbers.
+#%%
+    def managed_space_latest(self, building_number=1):
+        ''' Get latest managed space readings from managed spaces of (default) building number 1. 
+        Since the API call returns a list which excludes non-responsive sensors, 
+        the output from this function may be shorter than the total number of sensors.
 
         Returns
         -------
-        managed_space_latest_data: list of list of dictionaries. Output format depends on
-            number of indicies in 'building_numbers' input. 
-
-            If building_numbers has only one index or default is used, format is:
-            'managed_space_latest_data[a]', where 'a' is the first space.'
-
-            If building_numbers has multiple indicies, format is:         
-            'managed_space_latest_data[b][a]', where 'b' is the building number 
-            and 'a' is the space.
-
-        all_space_numbers: list of ints
-            Complete list of managed space numbers associated with building number.
+        managed_space_latest_data: dataframe containing one row for each responsive sensor. 
+        The 'spacenumbers' column match indices in 'self.managed_space_info'.
 
         '''
-        # if only one building is input, put it in list so the function can deal with it
-        if isinstance(building_numbers, int):
-            building_numbers = [building_numbers]
 
-        # empty lists for outputs and counters for success/failed data retrieval from BUILDINGS
-        managed_space_latest_data = []
-        all_space_numbers = []
-        fail = 0
-        succ = 0
+        all_possible_space_numbers = list(self.managed_space_info.index)
+        
+        # Construct the name of the function to be embedded into the
+        # API URL
+        function_name = "managedspace/latest/building/{}".format(
+            self.building_info['id'].loc[building_number])
+        
+        print('\nGetting latest managed space data.')
+        
+        # try the API call for the current building, except if fails
+        try:
+            ''' the 'managed_space_latest_data' variable will not include non-responsive sensors so will 
+            return a list shorter than total number of sensors in self.managed_space_info'''
+            managed_space_latest_data = self._call_API(function_name)
+                        # if the API call fails, state this and move to next
+        except Exception as e:
+            print('Could not aquire latest managed space data from building number {}: {}.'
+                  ' PROBLEM AQUIRING DATA. Error: {}' .format(1, self.building_info['name'].loc[building_number], str(e)))
 
-        # loop through building numbers listed in input
-        for i in building_numbers:
-            # Construct the name of the function to be embedded into the
-            # API URL
-            current_building_id = self.building_info[i-1]['id']
-            current_building_name = self.building_info[i-1]['name']
-            current_space_numbers, _ = get_lists_from_name_key(
-                self.managed_space_info)
+        # Check the ids of the returned managed spaces against all those available and return a list of corresponding indices from 'self'
+        returned_space_numbers = []
+        for space_id in managed_space_latest_data['managedspace']:                    
+            returned_space_numbers.append(int(self.managed_space_info[self.managed_space_info['id']==space_id].index.values))
+      
+        # add new column in respnse which corresponds with indices from self, sort, and make it the index column
+        managed_space_latest_data['spacenumber'] = returned_space_numbers
+        managed_space_latest_data = managed_space_latest_data.sort_values(by=['spacenumber'], inplace=False)
+        managed_space_latest_data = managed_space_latest_data.set_index(['spacenumber'])
 
-            function_name = "managedspace/latest/building/{}".format(
-                current_building_id)
+        ''' check for missing spaces and print names and numbers if one is found'''
+        for i in all_possible_space_numbers: 
+            if i not in returned_space_numbers: 
+                print('Managed space location number {}: {}. NO DATA RETURNED.'
+                      .format(i, self.managed_space_info['name'].loc[i]))
+       
+        print('Latest managed space readings aquired successfully from: {} of {} possible sensors.'
+              .format(len(returned_space_numbers), len(all_possible_space_numbers)))
 
-            ''' API call only returns working sensors. Following variables are needed
-            to populate a list including ALL sensors for output current_space_numbers'''
-            _, all_space_ids = get_key_names_and_values(
-                'id', self.managed_space_info)
-            _, all_space_names = get_key_names_and_values(
-                'name', self.managed_space_info)
-
-            # this is used to store data for current building
-            output_for_current_building = make_empty_list(
-                len(current_space_numbers))
-
-            # try the API call for the current building, except if fails
-            try:
-                ''' the 'response' variable will not include non-responsive sensors so will 
-                return a list shorter than total number of sensors in self.managed_space_info'''
-                response = self._call_API(function_name)
-
-                ''' take the output and put it into 'output_for_current_building', which has 
-                empty indices for non-responsive sensors'''
-                for space in response:
-                    space_index = all_space_ids.index(space['managedspace'])
-                    ''' put output in index which corresponds to id and number from 
-                    self.managed_space_info'''
-                    output_for_current_building[space_index] = space
-
-                ''' check for empty indices and throw an error showing the corresponding name if
-                one is found'''
-                for check in current_space_numbers:
-                    if not output_for_current_building[check-1]:
-                        space_name = all_space_names[check-1]
-                        print('Managed space location number {}: {}. NO DATA RETURNED.'
-                              .format(check, space_name))
-
-                # for the current building, fill the relevant output variables
-                managed_space_latest_data.append(output_for_current_building)
-                all_space_numbers.append(current_space_numbers)
-
-                # if there is only one building, explain output format, return variables and end here
-                if len(building_numbers) == 1:
-                    print('Latest managed space readings aquired successfully from: {}. '
-                          'Output format is: \'managed_space_latest_data[a]\', where \'a\' is the first space.'
-                          .format(self.building_info[i-1]['name']))
-                    return(managed_space_latest_data[i-1], all_space_numbers[i-1])
-                # or continue to the next building...
-                else:
-                    print('Successfully aquired latest managed space data from building number {}: {}.'
-                          .format(i, current_building_name))
-                    succ += 1
-                    managed_space_latest_data[i -
-                                              1] = output_for_current_building
-                    all_space_numbers[i-1] = current_space_numbers
-
-            # if the API call fails, state this and move to next
-            except Exception as e:
-                print('Could not aquire latest managed space data from building number {}: {}.'
-                      ' PROBLEM AQUIRING DATA. Error: {}' .format(i, current_building_name, str(e)))
-                fail += 1
-
-        # print summary if there were multiple buildings
-        print('Latest managed space readings aquired from {} buildings. Successful: {}.'
-              ' Failed: {}.\nOutput format is: \'managed_space_latest_data[b][a]\', where \'b\''
-              ' is the building number and \'a\' is the space.'
-              .format(succ + fail, succ, fail))
-
-        return(managed_space_latest_data, all_space_numbers)
-
+        return(managed_space_latest_data, returned_space_numbers)
+       
+#%%
     def sensor_reading_after(self,
-                             sensor_numbers=None,
-                             timestamp_epoch_millisec=None):
-        ''' Get last ‘max_rows’ of sensor readings for a given sensor location.
+                            sensor_numbers=None,
+                            timestamp_epoch_millisec=None):
+        ''' Get sensor readings (max 1000) for all, or a given sensor location, after a specified 
+        time point. No inputs returns data from all using timestamp from 1100 minutes ago.
 
         Parameters
         ----------
         sensor_numbers: int/list of ints
-            Single number or list. Use:
-            choose_by_number(self.sensor_location_info, 'sensor')
-            to get corresponding numbers.
+            Single number or list of numbers corresponding to sensor location numbers. Use: 
+            'chosen_numbers, chosen_names = choose_by_number(self.sensor_location_info)'
+            to get a list of numbers corresponding to sensor location names.
         timestamp_epoch_millisec: int
-            A time in ms epoch. Returns data from this time and includes up to
-            1000 time points (one per minute). Default 1100 (will usually return 
-            1000 rows of data for each available sensor).
+            A time in ms epoch. Returns data from this time and includes up to 1000 time points 
+            (one per minute). Default 1100 (usually returns 1000 rows for each available sensor).
 
         Returns
         -------
-        sensor_reading_after_data: list of list of dictionaries.
-            Each index will correspond with the sensor location number in the same
-            index in 'sensor_numbers'.
-        sensor_list: list of ints
-            The same as 'sensor_numbers'.
+        sensor_reading_after_data: list of dataframes
+            Data from responding sensors. Non-responding sensors are not included. 
+            Data in sensor_reading_after_data[x] is from the sensor location number in sensor_locations[x].            
+            The 'sensornumber' column in each sensor_reading_after_data index also corresponds to 
+            the relevant index in self.sensor_location_info.
+        sensor_locations: list of ints
+            List of responding sensors that returned data. The number in each element corresponds 
+            to a sensornumber index in self.sensor_location_info.
+
         '''
 
-        all_sensor_numbers = \
-            list(range(1, len(self.sensor_location_info)+1))
+        all_sensor_numbers = list(self.sensor_location_info.index)
 
-        # Converts int to dict if only one sensor is inputted.
         if isinstance(sensor_numbers, int):
             sensor_numbers = [sensor_numbers]
 
         if sensor_numbers is None:
-            sensor_numbers = \
-                list(range(1, len(self.sensor_location_info)+1))
+            sensor_numbers = all_sensor_numbers
 
-        if not any(i in sensor_numbers for i in all_sensor_numbers):
-            sys.exit('\nBad index in input list.')
+        for i in sensor_numbers: 
+            if i not in all_sensor_numbers: 
+                sys.exit('\nBad index in input list: {}. Check self.sensor_location_info for list.'.format(str(i)))
 
-        """ Default time is 1100 minutes before call was made. This is usually
+        """ Default time is 1100 minutes from when call was made. This is usually
         enough to get 1000 data points for each sensor. """
         if timestamp_epoch_millisec is None:
-            timestamp_epoch_millisec = time_now()-66000000
+            ##TODO: UNCOMMENT NEXT LINE, DELETE LINE BELOW
+            # timestamp_epoch_millisec = time_now()-66000000
+            timestamp_epoch_millisec = 1583020800000
 
         # Convert input time to ISO format
-        input_time = \
-            dt.datetime.utcfromtimestamp(
-                int(timestamp_epoch_millisec/1000)).isoformat()
+        input_time = dt.datetime.utcfromtimestamp(int(timestamp_epoch_millisec/1000)).isoformat()
 
-        print('Ms time epoch used for input: {}. Input in ISO format: {}'
+        print('\nGetting sensor reading after data.\nMs time epoch used for input: {}. Input in ISO format: {}.'
               .format(timestamp_epoch_millisec, input_time))
 
         sensor_reading_after_data = []
-        succ = 0
+        sensor_locations = []
         fail = 0
-
-        ''' Loop through all locations saving the the last nrows of each. Print wh-
-        ether each location is successful.
-        '''
-        for num, i in enumerate(sensor_numbers, start=0):
-            sensor = self.sensor_location_info[i-1]
-            function_name = "beta/sensorreading/sensorlocation/{}/after/{}".format(
-                            sensor['id'], timestamp_epoch_millisec)
+        succ = 0
+        
+        # enumerate because input_num and i are not necessarily related
+        for input_num, sensor_num in enumerate(sensor_numbers, start=0):
+            sensor = self.sensor_location_info.loc[sensor_num]
+            function_name = "beta/sensorreading/sensorlocation/{}/after/{}"\
+            .format(sensor['id'], timestamp_epoch_millisec)
 
             try:
                 response = self._call_API(function_name)
-                sensor_reading_after_data.append(response)
-
-                # Check whether data were returned.
-                if not sensor_reading_after_data[num]:
-                    print('Sensor number {}: {}. NO DATA RETURNED.' .format(
-                          sensor_numbers[num], sensor['name']))
-                    fail += 1
-                else:
-                    print('Sensor number {}: {}. Successfully aquired {} readings. '
-                          .format(sensor_numbers[num], sensor['name'],
-                                  len(sensor_reading_after_data[num])))
-                    succ += 1
             except Exception as e:
-                print('Sensor number {}: {}. PROBLEM AQUIRING READING FROM '
-                      'SENSOR. Error: {}' .format(sensor_reading_after_data[num],
-                                                  sensor['name'], str(e)))
+                print('Sensor number {}: {}. PROBLEM AQUIRING '
+                      'DATA. Error: {}' .format(sensor_num, sensor['name'], str(e)))
                 fail += 1
 
-        if isinstance(sensor_numbers, range):
-            sensor_numbers = list(sensor_numbers)
-        sensor_list = sensor_numbers.copy()
+            if not isinstance(response, pd.core.frame.DataFrame):
+                print('Sensor number {}: {}. NO DATA RETURNED.'
+                      .format(sensor_num, sensor['name']))
+                fail += 1
+            else:
+                
+                # Sort timestamp columns to match other functions
+                response = \
+                    response.rename(columns={'rxtimestamputc':'timestamputc',\
+                                             'rxepochmillisec':'timestampms', \
+                                             'sensorlocationcurrent':'sensorlocation'})
+                response['timestamputc'] = response['timestamputc'].apply(parse)
+               
+                # add 'sensornumber' column
+                ##TODO: Make sure sensornumber is correct.
+                response['sensornumber'] = sensor_num
+                
+                # add 'name' column for room name
+                response['name'] = list(self.sensor_location_info['name'].loc[response['sensornumber']])
 
-        print("Aquired data from {} sensor(s). Succsessful: {}. Failed: {}.\n"
-              .format(num+1, succ, fail))
+                sensor_reading_after_data.append(response)
+                sensor_locations.append(sensor_num)
+                                
+                print('Sensor number {}: {}. Successfully aquired'
+                      ' {} rows of data.'
+                      .format(sensor_num, sensor['name'], len(sensor_reading_after_data[-1])))
+                succ += 1
 
-        return(sensor_reading_after_data, sensor_list)
+        print('Data successfully aquired from {} of {} possible sensor location(s).'
+              .format(succ, succ + fail))
 
-    def sensor_reading_latest(self, building_numbers=1):
-        ''' Get latest sensor reading from sensors of a given building. Since the 
-        API call returns a list which excludes non-responsive sensors, this function 
-        builds a list of all sensors from self.sensor_location_info and leaves empty
-        indexes when sensors are unresponsive.
+        return(sensor_reading_after_data, sensor_locations)
 
-        Parameters
-        ----------
-        building_numbers: int/list of ints
-            Single number or list. Use:
-            sensor_reading_numbers, _ = choose_by_number(self.building_info, 'name')
-            to get corresponding numbers.
+#%%
+    def sensor_reading_latest(self, building_number=1):
+        ''' Get latest sensor readings from sensor locations of (default) building number 1. 
+        Since the API call returns a list which excludes non-responsive sensors, 
+        the output from this function may be shorter than the total number of sensors.
 
         Returns
         -------
-        sensor_reading_latest_data: list of list of dictionaries. Output format depends on
-            number of indicies in 'building_numbers' input. 
-
-            If building_numbers has only one index or default is used, format is:
-            'sensor_reading_latest_data[a]', where 'a' is the first sensor.'
-
-            If building_numbers has multiple indicies, format is:         
-            'sensor_reading_latest_data[b][a]', where 'b' is the building number 
-            and 'a' is the sensor.
-
-        all_sensor_numbers: list of ints
-            Complete list of sensor numbers associated with building number.
+        sensor_reading_latest: dataframe containing one row for each responsive sensor. 
+        The 'sensornumbers' column match indices in 'self.sensor_location_info'.
 
         '''
-        # if only one building is input, put it in list so the function can deal with it
-        if isinstance(building_numbers, int):
-            building_numbers = [building_numbers]
 
-        # empty lists for outputs and counters for success/failed data retrieval from BUILDINGS
-        sensor_reading_latest_data = []
-        all_sensor_numbers = []
-        fail = 0
-        succ = 0
+        all_possible_sensor_numbers = list(self.sensor_location_info.index)
+        
+        # Construct the name of the function to be embedded into the
+        # API URL
+        function_name = "sensorreading/latest/building/{}".format(
+            self.building_info['id'].loc[building_number])
 
-        # loop through building numbers listed in input
-        for i in building_numbers:
-            # Construct the name of the function to be embedded into the
-            # API URL
-            current_building_id = self.building_info[i-1]['id']
-            current_building_name = self.building_info[i-1]['name']
-            current_sensor_numbers, _ = get_lists_from_name_key(
-                self.sensor_location_info)
+        print('\nGetting latest sensor reading data.')
 
-            function_name = "sensorreading/latest/building/{}".format(
-                current_building_id)
+        # try the API call for the current building, except if fails
+        try:
+            ''' the 'sensor_reading_latest' variable will not include non-responsive sensors so will 
+            return a list shorter than total number of sensors in self.sensor_location_info'''
+            sensor_reading_latest = self._call_API(function_name)
+                        # if the API call fails, state this and move to next
+        except Exception as e:
+            print('Could not aquire latest sensor reading data from building number {}: {}.'
+                  ' PROBLEM AQUIRING DATA. Error: {}' .format(1, self.building_info['name'].loc[building_number], str(e)))
 
-            ''' API call only returns working sensors. Following variables are needed
-            to populate a list including ALL sensors for output current_sensor_numbers'''
-            _, all_sensor_ids = get_key_names_and_values(
-                'id', self.sensor_location_info)
-            _, all_sensor_names = get_key_names_and_values(
-                'name', self.sensor_location_info)
+        # Check the ids of the returned sensor locations against all those available and return a list of corresponding indices from 'self'
+        returned_sensor_numbers = []
+        for sensor_id in sensor_reading_latest['sensorlocation']:
+        ##TODO: check this is correct:                   
+            returned_sensor_numbers.append(int(self.sensor_location_info[self.sensor_location_info['id']==sensor_id].index.values))
+      
+       
+        # Sort timestamp columns to match other functions       
+        sensor_reading_latest['timestamputc'] = sensor_reading_latest['timestamputc'].apply(parse)
+        sensor_reading_latest['timestampms'] = sensor_reading_latest[['timestamputc']].apply(lambda x: x[0].timestamp(), axis=1).astype('int64')*1000
+        
+        # add new column in respnse which corresponds with indices from self, sort, and make it the index column
+        sensor_reading_latest['sensornumber'] = returned_sensor_numbers
+        sensor_reading_latest = sensor_reading_latest.sort_values(by=['sensornumber'], inplace=False)
+        sensor_reading_latest = sensor_reading_latest.set_index(['sensornumber'])
+        
+        # add 'sensornumber' as a series AS WELL AS the index
+        sensor_reading_latest['sensornumber'] = sensor_reading_latest.index
+        
+        # add 'name' column for room name
+        sensor_reading_latest['name'] = self.sensor_location_info['name'].loc[sensor_reading_latest['sensornumber']]
+        
+        ''' check for missing spaces and print names and numbers if one is found'''
+        for i in all_possible_sensor_numbers: 
+            if i not in returned_sensor_numbers: 
+                print('Sensor number {}: {}. NO DATA RETURNED.'
+                      .format(i, self.sensor_location_info['name'].loc[i]))
+       
+        print('Latest sensor readings aquired successfully from: {} of {} possible sensors.'
+              .format(len(returned_sensor_numbers), len(all_possible_sensor_numbers)))
 
-            # this is used to store data for current building
-            output_for_current_building = make_empty_list(
-                len(current_sensor_numbers))
+        return(sensor_reading_latest, returned_sensor_numbers)
 
-            # try the API call for the current building, except if fails
-            try:
-                ''' the 'response' variable will not include non-responsive sensors so will 
-                return a list shorter than total number of sensors in self.sensor_reading_info'''
-                response = self._call_API(function_name)
-
-                ''' take the output and put it into 'output_for_current_building', which has 
-                empty indices for non-responsive sensors'''
-                for sensor in response:
-                    sensor_index = all_sensor_ids.index(
-                        sensor['sensorlocation'])
-                    ''' put output in index which corresponds to id and number from 
-                    self.sensor_location_info'''
-                    output_for_current_building[sensor_index] = sensor
-
-                ''' check for empty indices and throw an error showing the corresponding name if
-                one is found'''
-                for check in current_sensor_numbers:
-                    if not output_for_current_building[check-1]:
-                        sensor_name = all_sensor_names[check-1]
-                        print('Sensor location number {}: {}. NO DATA RETURNED.'
-                              .format(check, sensor_name))
-
-                # for the current building, fill the relevant output variables
-                sensor_reading_latest_data.append(output_for_current_building)
-                all_sensor_numbers.append(current_sensor_numbers)
-
-                # if there is only one building, explain output format, return variables and end here
-                if len(building_numbers) == 1:
-                    print('Latest sensor readings aquired successfully from: {}. '
-                          'Output format is: \'sensor_reading_latest_data[a]\', where \'a\' is the first sensor.'
-                          .format(self.building_info[i-1]['name']))
-                    return(sensor_reading_latest_data[i-1], all_sensor_numbers[i-1])
-                # or continue to the next building...
-                else:
-                    print('Successfully aquired latest sensor data from building number {}: {}.'
-                          .format(i, current_building_name))
-                    succ += 1
-                    sensor_reading_latest_data[i -
-                                               1] = output_for_current_building
-                    all_sensor_numbers[i-1] = current_sensor_numbers
-
-            # if the API call fails, state this and move to next
-            except Exception as e:
-                print('Could not aquire latest sensor data from building number {}: {}.'
-                      ' PROBLEM AQUIRING DATA. Error: {}' .format(i, current_building_name, str(e)))
-                fail += 1
-
-        # print summary if there were multiple buildings
-        print('Latest sensor readings aquired from {} buildings. Successful: {}.'
-              ' Failed: {}.\nOutput format is: \'sensor_reading_latest_data[b][a]\', where \'b\''
-              ' is the building number and \'a\' is the sensor.'
-              .format(succ + fail, succ, fail))
-
-        return(sensor_reading_latest_data, all_sensor_numbers)
-
+#%%
     def plot_managed_spaces(self, managed_spaces=None,
                             managed_space_after_data=None):
         ''' Plot managed space data. Data from all managed spaces plotted onto one
@@ -770,24 +577,22 @@ class Scraper():
 
         Parameters
         ----------
-        managed_space_numbers: int/list of ints
+        managed_spaces: int/list of ints
             Single number or list. Use:
-            choose_by_number(self.managed_space_info, 'managed space')
+            'chosen_numbers, chosen_names = choose_by_number(self.managed_space_info)'
             to get corresponding numbers.
 
-        managed_space_after_data: list of list of dictionaries.
+        managed_space_after_data: list of dataframes.
             Corresponds to 'managed_space_after_data' output from
-            managed_space_after()'.
+            self.managed_space_after()'.
 
         Returns
         -------
         Plots overlays of occupancy of managed spaces on a single axis.
         '''
 
-        if managed_space_after_data is None and \
-           managed_spaces is None:
-            managed_space_after_data, managed_spaces = \
-                self.managed_space_after()
+        if managed_space_after_data is None and managed_spaces is None:
+            managed_space_after_data, managed_spaces = self.managed_space_after()
         elif managed_space_after_data is None:
             managed_space_after_data, _ = \
                 self.managed_space_after(managed_space_numbers=managed_spaces)
@@ -798,24 +603,25 @@ class Scraper():
         if isinstance(managed_spaces, int):
             managed_spaces = [managed_spaces]
 
+        print('\nPlotting managed space sensor data.')
+
         legendlabels = []
 
         for data, space_number in zip(managed_space_after_data,
                                       managed_spaces):
-            if not data:
+            if not any(data):
                 print('Managed space number {}: {}. NO DATA RETURNED'.format(
-                    space_number, self.managed_space_info[space_number-1]['name']))
+                    space_number, self.managed_space_info['name'].loc[space_number]))
                 continue
             else:
                 legendlabels.append(
-                    self.managed_space_info[space_number-1]['name'])
+                    self.managed_space_info['name'].loc[space_number])
                 print('Managed space number {}: {}. Data Available. '
                       'Plotting chart.'
                       .format(space_number,
-                              self.managed_space_info[space_number-1]
-                              ['name']))
+                              self.managed_space_info['name'].loc[space_number]))
 
-            currentdataframe = pd.DataFrame(data)
+            currentdataframe = data
             currentdataframe['rxtimestamputc'] = \
                 pd.to_datetime(currentdataframe['rxtimestamputc'])
             currentdataframe = currentdataframe.set_index('rxtimestamputc')
@@ -838,9 +644,9 @@ class Scraper():
             axes.xaxis.set_major_formatter(formatter)
             plt.show()
         except:
-            sys.exit('Could not plot - faulty sensor or not data returned')
-        print('\n')
+            sys.exit('Could not plot - faulty sensor or no data returned')
 
+#%%
     def plot_sensor_reading_after(self, sensor_numbers=None,
                                   sensor_reading_after_data=None):
         ''' Plot sensor data (after). Data from each sensor are plotted on
@@ -851,12 +657,12 @@ class Scraper():
         ----------
         sensor_numbers: int/list of ints
             Single number or list. Use:
-            choose_by_number(self.get_sensor_location_info, 'sensor')
+            'chosen_numbers, chosen_names = choose_by_number(self.sensor_location_info)'
             to get corresponding numbers.
 
-        sensor_reading_after_data: list of list of dictionaries.
+        sensor_reading_after_data: list dataframes.
             Corresponds to 'sensor_reading_after_data' output from
-            sensor_reading_after()'.
+            self.sensor_reading_after()'.
 
         Returns
         -------
@@ -871,46 +677,45 @@ class Scraper():
             sensor_reading_after_data, _ = \
                 self.sensor_reading_after(sensor_numbers=sensor_numbers)
         elif sensor_reading_after_data and sensor_numbers is None:
-            print('To plot directly from data, a list of sensor location numbers '
+            print('To plot directly from data, a list of sensor numbers '
                   'must also be provided.')
 
         if isinstance(sensor_numbers, int):
             sensor_numbers = [sensor_numbers]
 
+        print('\nPlotting sensor data.')
+
         labelsdone = 0
         for data, sensor_number in zip(sensor_reading_after_data,
                                        sensor_numbers):
-            if not data:
+            if not any(data):
                 print('Sensor number {}: {}. NO DATA RETURNED'
                       .format(sensor_number,
-                              self.sensor_location_info[sensor_number-1]['name']))
+                              self.sensor_location_info['name'].loc[sensor_number]))
                 continue
             else:
                 print('Sensor number {}: {}. Data Available. Plotting chart.'
                       .format(sensor_number,
-                              self.sensor_location_info[sensor_number-1]["name"]))
+                              self.sensor_location_info['name'].loc[sensor_number]))
                 # this section to obtain plot
                 if labelsdone == 0:
-                    paramlabels = []
-                    for label in data[0].keys():
-                        if isinstance(data[0][label], int)\
-                                or isinstance(data[0][label], float):
-                            paramlabels.append(label)
-                    del paramlabels[10], paramlabels[9], paramlabels[0]
+                    paramlabels = ['occupancy', 'voc', 'co2', 'temperature',
+                                   'pressure', 'humid', 'lux', 'noise']
+                   
                     plotlabels = ['Occupancy\n(n)', 'VOC\n(ppm?)', 'CO2\n(ppm?)',
                                   'Temperature\n(°C)', 'Pressure\n(mBar)',
                                   'Humidity\n(RH)', 'Light Intensity\n(lux)',
                                   'Noise Levels\n(dB)']
 
-                current_dataframe = pd.DataFrame(data)
-                current_dataframe['rxtimestamputc'] =\
-                    pd.to_datetime(current_dataframe['rxtimestamputc'])
+                current_dataframe = data
+                current_dataframe['timestamputc'] =\
+                    pd.to_datetime(current_dataframe['timestamputc'])
                 current_dataframe = current_dataframe.set_index(
-                    'rxtimestamputc')
+                    'timestamputc')
 
                 axtitle = str('Sensor readings (after) from sensor number {}: {}.'
                               .format(sensor_number,
-                                      self.sensor_location_info[sensor_number-1]['name']))
+                                      self.sensor_location_info['name'].loc[sensor_number]))
                 axes = current_dataframe[paramlabels].plot(marker='.', alpha=0.5,
                                                            figsize=(12, 26),
                                                            subplots=True,
@@ -923,17 +728,13 @@ class Scraper():
                                   fontsize=10, ha='right', va='baseline')
 
                 plt.xlabel('Time')
-                ''' ax.set_title("Sensor readings from sensor number {}: {}."
-                .format(sensorno, sensorlocationdata[sensorno-1]['name']),
-                loc='center') # set formatter '''
                 locator = mdates.AutoDateLocator(minticks=8, maxticks=14)
                 formatter = mdates.ConciseDateFormatter(locator)
                 ax.xaxis.set_major_locator(locator)
                 ax.xaxis.set_major_formatter(formatter)
                 plt.show()
-        print('\n')
 
-
+#%%
 def print_attributes(obj):
     ''' Print attributes of class object 'obj'.
 

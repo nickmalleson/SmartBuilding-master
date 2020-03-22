@@ -15,15 +15,15 @@ import scraper as scrp
 scraper = scrp.Scraper()
 
 choices = input('What do you want to plot? Press enter for all. \n1. Managed '
-                'space data\n2. Sensor reading data\n')
+                'space data\n2. Sensor reading data \n>>')
 
 if not choices:
     chosen_space_numbers, chosen_space_names = \
-        scrp.choose_by_number(scraper.managed_space_info, 'Managed space')
+        scrp.choose_by_number(scraper.managed_space_info)
     scraper.plot_managed_spaces(managed_spaces=chosen_space_numbers)
 
     chosen_location_numbers, chosen_location_names = \
-        scrp.choose_by_number(scraper.sensor_location_info, 'Sensor location')
+        scrp.choose_by_number(scraper.sensor_location_info)
     scraper.plot_sensor_reading_after(sensor_numbers=chosen_location_numbers)
 
 elif choices:
@@ -32,13 +32,12 @@ elif choices:
 
     if choices == 1:
         chosen_space_numbers, chosen_space_names = \
-            scrp.choose_by_number(scraper.managed_space_info, 'Managed space')
+            scrp.choose_by_number(scraper.managed_space_info)
 
         scraper.plot_managed_spaces(managed_spaces=chosen_space_numbers)
     elif choices == 2:
         chosen_location_numbers, chosen_location_names = \
-            scrp.choose_by_number(scraper.sensor_location_info,
-                                 'Sensor location')
+            scrp.choose_by_number(scraper.sensor_location_info)
 
         scraper.plot_sensor_reading_after(sensor_numbers=chosen_location_numbers)
 else:
