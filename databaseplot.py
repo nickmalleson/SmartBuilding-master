@@ -162,7 +162,7 @@ conn = sqlite3.connect("./database.db")
 c = conn.cursor()
 
 # this is the time of the earliest sensor reading in the database
-earliest_time = 1580920305102
+earliest_time = 1580920300000
 
 # run program
 plot_from_database()
