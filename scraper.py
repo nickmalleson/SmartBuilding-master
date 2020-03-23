@@ -144,27 +144,40 @@ class Scraper():
             print("Room information retrieved successfully.")
 
     @staticmethod
-    def _login():
+    def _login(auto=True):
         '''Obtain and check username and password for Smart Building API.
 
-        Username and password are obtained by user input. These are then check-
+        Username and password can be obtained by user input, or by reading a
+        parameters file (see the `auto` parameter). The credentials are then check-
         ed by using the 'building' function on the API, and if successful, use-
         rname, password, and the output of the API 'building' function are ret-
         urned.
 
+        Parameters
+        ----------
+        auto: bool (default true)
+            If true then automatically get the credentials from a parameters file.
+            Otherwise ask for them from user input.
+
         '''
 
-        # Prompt to enter username or press enter to use saved details
-        username = input(
-            "Enter username or press enter to log in as 'yanjiedong':\n>>")
+        username = ""
+        password = ""
 
-        # if enter was pressed use saved username and password
-        if username == '':
+
+        if auto:
             username, password = get_login_info()
-        else:
-            '''Enter password manually. Password is hidden but only in externa-
-            l console if using Spyder.'''
-            password = getpass.getpass(prompt='Password:')
+
+        else: # Otherwise prompt to enter username or press enter to use saved details
+            username = input(
+                "Enter username or press enter to log in as 'yanjiedong':")
+            # if enter was pressed use saved username and password
+            if username == '':
+                username, password = get_login_info()
+            else:
+                # Enter password manually. Password is hidden but only in external
+                # console if using Spyder.'''
+                password = getpass.getpass(prompt='Password:')
 
         # Use 'building' API function to check username and password.
         response = r.get(
