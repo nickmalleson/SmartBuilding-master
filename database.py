@@ -1,4 +1,4 @@
-# Code to create, add to and retrieve from an sqlite database
+lk a# Code to create, add to and retrieve from an sqlite database
 # It requires the packages:
 #   - 'pyodbc' which contains general functions for connecting to databases
 #   - 'sqlite' which has sqlite drivers specifically (SQLite is the database we'll use)
@@ -12,193 +12,219 @@
 import sqlite3
 import scraper as scrp
 import os
+import pandas as pd
 
 # What the script is going to do
 # 0 (default) just get latest data from AIP
 # 1 get all data available
 # 2 get all data from a particular time point (specified on command line)
-STATUS = 0
+STATUS = 1
+
+#%%
+class Database():
+    '''Obtains details of existing database entries.
+    '''
+
+    def __init__(self):
+            
+        self.conn, self.c = Database._connect_to_database(self)        
+        self.existing_readings = Database._retrieve_existing_readings(self)
+        self.smart_building = scrp.Scraper()
 
 
-#%% Some functions
-def insert_sensor_readings_latest(sensor_reading_latest_data):
-    ''' Tries to insert data from the API in to the database using output from
-    scraper.sensor_reading_latest() '''
-
-    print('\nTrying to insert "sensor_reading_latest_data"...')
+    @staticmethod
+    def _connect_to_database(self):
+        ##TODO: DODGY USE OF GLOBAL VARIABLES WHILST TESTING. NEEDS SORTING OUT
+        # Connect to the database (creates a Connection object)
+        # global conn, c
     
-    # For checking whether there is already a reading with same time index
-    duplicates = 0
+        try:
+            # global conn, c
     
-    # loop through the rows (sensor readings)
-    for sensor_number, row in sensor_reading_latest_data.iterrows():    
-        #%% check whether there is already a sensor reading for this sensor at this time and pass continue if there is
-        if check_for_duplicates(row) == 1:
-            print('Sensor {}: {} already has reading for time {}.'
-                  .format(sensor_number, 
-                          smart_building.sensor_location_info['name'].loc[sensor_number], 
-                          row['timestamputc']))
-            duplicates +=1 
-            continue
-    
-        insert_row(row)
+            # connect to database
+            conn = sqlite3.connect("../database/database.db")
         
-    print('{} row(s) were skipped as sensor reading(s) already existed for that time.'
-          .format(duplicates))
-
-
-def insert_sensor_readings_after(sensor_reading_after):
-    ''' Tries to insert data from the API in to the database using output from
-    scraper.sensor_reading_after() '''
+            # Create a cursor to operate on the database
+            c = conn.cursor()
+        except Exception as e:
+                print('Error: ', e)
+        return(conn, c)
+ 
     
-    print('\nTrying to insert "sensor_reading_after_data"...')
+    @staticmethod
+    def _retrieve_existing_readings(self):
+        '''Obtains details of existing database entries to check against.
+        Returns a dataframe containing a list of existing time readings and
+        corresponding sensor numbers
+        '''
 
-    # Loop through each index (sensor) in sensor_reading_after
-    for sensor_dataframe in sensor_reading_after:
-        print('Trying to insert readings from sensor {}, starting with most recent in current list...'\
-              .format(sensor_dataframe['sensornumber'].loc[1]))
+        try:
+            existing_readings = pd.read_sql('SELECT timestampms, sensorlocation ' \
+                                            'FROM sensor_readings '\
+                                            'ORDER BY timestamputc;',     
+                                            self.conn)
+            if any(existing_readings.applymap(type)==bytes):
+                print("Database contains timestamps in 'bytes' format when they "\
+                        "should be int64.")
+            return(existing_readings)
+        except Exception as e:        
+            print("Error: ", e)       
+
+
+    def restart(self):
+        print("Connection error, restarting kernel...")
+        os._exit(00)
+        self.connect_to_database()    
+
+
+    def insert_row(self, row):
+        try:
+            check = self.c.execute('INSERT INTO sensor_readings (time, timestampms, timestamputc, '\
+                'sensor_number, sensor_name, co2, humidity, lux, noise, occupancy, '\
+                'pressure, sensorlocation, temperature, voc) '\
+                'VALUES(strftime(?,?),?,?,?,?,?,?,?,?,?,?,?,?,?)', \
+                ['%s','now', row['timestampms'], str(row['timestamputc']), 
+                 row['sensornumber'], \
+                 row['name'], \
+                 row['co2'], row['humid'], row['lux'], row['noise'], \
+                 row['occupancy'], row['pressure'], row['sensorlocation'], \
+                 row['temperature'], row['voc']])
+        except Exception as e:        
+            print("Error: ", e)
+
+
+    def check_for_duplicates(self, row):
+        ''''Check whether sensor reading exists in database for this sensor and time (ms).'''
+        if self.existing_readings is None:
+            return(0)
+        else:
+            test = self.existing_readings.loc[ \
+                      (self.existing_readings['timestampms'] == row['timestampms']) & \
+                      (self.existing_readings['sensorlocation'] == row['sensorlocation'])]
+
+        if len(test) > 0:
+            return(1)
+        else:
+            return(0)
+
+
+    #%% Some functions
+    def insert_sensor_readings_latest(self, sensor_reading_latest_data):
+        ''' Tries to insert data from the API in to the database using output from
+        scraper.sensor_reading_latest() '''
+    
+        print('\nTrying to insert "sensor_reading_latest_data"...')
+        
         # For checking whether there is already a reading with same time index
         duplicates = 0
         
+        # loop through the rows (sensor readings)
+        for sensor_number, row in sensor_reading_latest_data.iterrows():    
+            #%% check whether there is already a sensor reading for this sensor at this time and pass continue if there is
+            if self.check_for_duplicates(row) == 1:
+                print('Sensor {}: {} already has reading for time {}.'
+                      .format(sensor_number, 
+                              self.smart_building.sensor_location_info['name'].loc[sensor_number], 
+                              row['timestamputc']))
+                duplicates +=1 
+                continue
         
-        ##TODO: this loops through the dataframe backwards so because it is quicket. Best way?? Check 5 rows not 1
-        # Loop through (sensor reading) for sensor dataframe by index in reverse i.e. from last row to row at 0th index.
-        for row_num in range(sensor_dataframe.shape[0] - 1, -1, -1):
-            # get row contents as series using iloc{] and index position of row
-            # rowSeries = sensor_dataframe.iloc[i]
-            row = sensor_dataframe.iloc[row_num]
-            # print row contents
-            # print('Trying to insert sensor {}, row {}'.format(row['sensornumber'], row_num))
-
-            # # Loop through each row (sensor reading) for sensor 
-            # for reading_no, row in sensor_dataframe.iterrows():
+            self.insert_row(row)
             
-            #%% continue if already a sensor reading in database with same time index
-            if check_for_duplicates(row) == 1:
-               duplicates +=1
-               n_rows_skipped = row_num+1
-               print('The first {} row(s) were skipped for sensor {}, as sensor reading(s) '\
-                     'already existed for that time.'
-                     .format(n_rows_skipped,row['sensornumber']))
-               break
+        print('Readings from {} sensor(s) skipped as sensor reading(s) already existed for that time.'
+              .format(duplicates))
+    
+    
+    def insert_sensor_readings_after(self, sensor_reading_after):
+        ''' Tries to insert data from the API in to the database using output from
+        scraper.sensor_reading_after() '''
         
-            insert_row(row)
-
-
-def insert_row(row):
-    try:
-        check = c.execute('INSERT INTO sensor_readings (time, timestampms, timestamputc, '\
-            'sensor_number, sensor_name, co2, humidity, lux, noise, occupancy, '\
-            'pressure, sensorlocation, temperature, voc) '\
-            'VALUES(strftime(?,?),?,?,?,?,?,?,?,?,?,?,?,?,?)', \
-            ['%s','now', row['timestampms'], str(row['timestamputc']), 
-             row['sensornumber'], \
-             row['name'], \
-             row['co2'], row['humid'], row['lux'], row['noise'], \
-             row['occupancy'], row['pressure'], row['sensorlocation'], \
-             row['temperature'], row['voc']])
-    except Exception as e:        
-        print("Error: ", e)
-
-
-def check_for_duplicates(row):
-    ''''Check whether sensor reading exists in database for this sensor and time (ms).'''
+        print('\nTrying to insert "sensor_reading_after_data"...')
     
-    try:
-        check = c.execute("SELECT EXISTS(SELECT sensor_name FROM sensor_readings "\
-                      "WHERE timestamputc = ? AND sensorlocation = ?);", \
-                      [str(row['timestamputc']), row['sensorlocation']])
-    except Exception as e:
-        print("Error: ", e)
+        # Loop through each index (sensor) in sensor_reading_after
+        for sensor_dataframe in sensor_reading_after:
+            print('Trying to insert readings from sensor {}...'\
+                  .format(sensor_dataframe['sensornumber'].loc[1]))
+            # For checking whether there is already a reading with same time index
+            duplicates = 0
+
+            for sensor_number, row in sensor_dataframe.iterrows():  
+                #%% continue if already a sensor reading in database with same time index
+                if self.check_for_duplicates(row) == 1:
+                   duplicates +=1
+                   n_rows_skipped = row_num+1
+                   print('The first {} row(s) were skipped for sensor {}, as sensor reading(s) '\
+                         'already existed for that time.'
+                         .format(n_rows_skipped,row['sensornumber']))
+                   break
+            
+                self.insert_row(row)
+
+
+    def find_earliest_time(self):
+        '''' Checks earliest reading for each sensor by calling scraper.sensor_reading_after() 
+        with an input time before the sensors were installed. The first point returned 
+        for each sensor will therefore be the earliest reading.'''
     
-    result = check.fetchone()[0]
- 
-    return(result)
-
-
-def find_earliest_time():
-    '''' Checks earliest reading for each sensor by calling scraper.sensor_reading_after() 
-    with an input time before the sensors were installed. The first point returned 
-    for each sensor will therefore be the earliest reading.'''
-
-    sensor_reading_after_data, _ = smart_building.sensor_reading_after(timestamp_epoch_millisec=1546300800000)
+        sensor_reading_after_data, _ = \
+            self.smart_building.sensor_reading_after(timestamp_epoch_millisec=1546300800000)
+        
+        earliest_time_list = []
+        for i in sensor_reading_after_data:
+            earliest_time_list.append(i['timestampms'][1])
+        earliest_time = min(earliest_time_list)
     
-    earliest_time_list = []
-    for i in sensor_reading_after_data:
-        earliest_time_list.append(i['timestampms'][1])
-    earliest_time = min(earliest_time_list)
-
-    return(earliest_time, sensor_reading_after_data)
-
-
-def populate_database():
-    ''' Calls API and returns readings from the earliest process, then in steps 
-    of 1000 minutes until the current time. Note: runs based on earliest from 
-    API, not from what exists in database.'''
+        return(earliest_time, sensor_reading_after_data)
     
-    # check when to start collecting data from
-    earliest_time, sensor_reading_after_data = find_earliest_time()
-
-    # put current time into variable
-    time_now = scrp.time_now()
     
-    # insert the first time
-    insert_sensor_readings_after(sensor_reading_after_data)
-
-    # in steps of 1000 minutes, call API to retrieve data and insert into database.
-    # Note: typical interval between sensor reading is 1 minute, API call returns max 1000 rows.
-    for input_time in range(earliest_time, time_now, 60000000):
-        sensor_reading_after_data, all_sensor_numbers = \
-            smart_building.sensor_reading_after(timestamp_epoch_millisec=input_time)
-        insert_sensor_readings_after(sensor_reading_after_data)
-
-
-def populate_from(time_from):
-    ''' Populates database with calls API from 'time_from' until now. time_now
-    is an integer ms time epoch. API calls are made in steps of 1000 minutes. '''
-
-    # get current time
-    time_now = scrp.time_now()   
+    def populate_database(self):
+        ''' Calls API and returns readings from the earliest process, then in steps 
+        of 1000 minutes until the current time. Note: runs based on earliest from 
+        API, not from what exists in database.'''
+        
+        # check when to start collecting data from
+        earliest_time, sensor_reading_after_data = self.find_earliest_time()
     
-    # in steps of 1000 minutes, call API to retrieve data and insert into database.
-    # Note: typical interval between sensor reading is 1 minute, API call returns max 1000 rows.
-    for input_time in range(time_from, time_now, 60000000):
-        sensor_reading_after_data, all_sensor_numbers = \
-            smart_building.sensor_reading_after(timestamp_epoch_millisec=input_time)
-        insert_sensor_readings_after(sensor_reading_after_data)
-
-
-def restart():
-    print("Connection error, restarting kernel...")
-    os._exit(00)
-    connect_to_database()    
-
-
-def connect_to_database():
-    ##TODO: DODGY USE OF GLOBAL VARIABLES WHILST TESTING. NEEDS SORTING OUT
-    # Connect to the database (creates a Connection object)
-    global conn, c
-
-    try:
-        global conn, c
-
-        # connect to database
-        conn = sqlite3.connect("./database.db")
+        # put current time into variable
+        time_now = scrp.time_now()
+        
+        # insert the first time
+        self.insert_sensor_readings_after(sensor_reading_after_data)
     
-        # Create a cursor to operate on the database
-        c = conn.cursor()
-    except Exception as e:
-            print('Error: ', e)
-    return()
+        # in steps of 1000 minutes, call API to retrieve data and insert into database.
+        # Note: typical interval between sensor reading is 1 minute, API call returns max 1000 rows.
+        for input_time in range(earliest_time, time_now, 60000000):
+            sensor_reading_after_data, all_sensor_numbers = \
+                self.smart_building.sensor_reading_after(timestamp_epoch_millisec=input_time)
+            self.insert_sensor_readings_after(sensor_reading_after_data)
+
+
+    def populate_from(self, time_from):
+        ''' Populates database with calls API from 'time_from' until now. time_now
+        is an integer ms time epoch. API calls are made in steps of 1000 minutes. '''
+    
+        # get current time
+        time_now = scrp.time_now()   
+        
+        # in steps of 1000 minutes, call API to retrieve data and insert into database.
+        # Note: typical interval between sensor reading is 1 minute, API call returns max 1000 rows.
+        for input_time in range(time_from, time_now, 60000000):
+            sensor_reading_after_data, all_sensor_numbers = \
+                database.smart_building.sensor_reading_after(timestamp_epoch_millisec=input_time)
+            self.insert_sensor_readings_after(sensor_reading_after_data)
 
 
 #%% Program starts here
 
 # Connect to the database
 # os._exit(00)
-connect_to_database()   
+database = Database()
+
+# sensor_reading_latest_data, all_sensor_numbers = database.smart_building.sensor_reading_latest()
+# database.insert_sensor_readings_latest(sensor_reading_latest_data)
+
 # Declare scraper instance
-smart_building = scrp.Scraper()
+# smart_building = scrp.Scraper()
 
 
 #%% 
@@ -208,22 +234,22 @@ already exists in database. '''
 
 #building_info
 try:
-    for i, row in smart_building.building_info.iterrows():
-        c.execute('INSERT INTO buildings (building_id, building_number, '\
+    for i, row in database.smart_building.building_info.iterrows():
+        database.c.execute('INSERT INTO buildings (building_id, building_number, '\
                   'building_name) VALUES(?,?,?)', 
                   [row['id'], i, row['name']])
 except Exception as e:
     if str(e) == 'database is locked':
         print('Database is locked. Trying to reconnect to database... ')
-        restart()             
+        database.restart()             
     else:  
         print('Error: ', e)
 
 
 #room_info
 try:    
-    for i, row in smart_building.room_info.iterrows():    
-        c.execute('INSERT INTO rooms (room_id, room_number, room_name, '\
+    for i, row in database.smart_building.room_info.iterrows():    
+        database.c.execute('INSERT INTO rooms (room_id, room_number, room_name, '\
                   'building_id, building_name) '\
                   'VALUES(?,?,?,?,?)', [row['id'], i, row['name'], \
                                         row['building'], row['buildingname']])
@@ -233,8 +259,8 @@ except Exception as e:
 
 #sensor_info
 try:
-    for i, row in smart_building.sensor_location_info.iterrows():    
-        c.execute('INSERT INTO sensors (sensor_id, sensor_number, sensor_name, '\
+    for i, row in database.smart_building.sensor_location_info.iterrows():    
+        database.c.execute('INSERT INTO sensors (sensor_id, sensor_number, sensor_name, '\
                   'room_id, room_name) '\
                   'VALUES(?,?,?,?,?)', [row['id'], i, row['name'], row['room'], \
                                         row['roomname']])
@@ -251,23 +277,19 @@ except Exception as e:
 # insert_sensor_readings_after(sensor_reading_after_data)
 
 # get the latest 1 row of data from each sensor. Put in database
-sensor_reading_latest_data, all_sensor_numbers = smart_building.sensor_reading_latest()
-insert_sensor_readings_latest(sensor_reading_latest_data)
+# sensor_reading_latest_data, all_sensor_numbers = database.smart_building.sensor_reading_latest()
+# database.insert_sensor_readings_latest(sensor_reading_latest_data)
 
-# populate from certain time 1546300800000. Input in ISO format: 2020-02-18T04:31:45
-populate_from(1584760305102)
+# # populate from certain time 1584662400000. Input in ISO format: Fri Mar 20 2020 00:00:00
+# database.populate_from(1584662400000)
 #
 
 if STATUS==1:
-    populate_database()
+    database.populate_database()
 elif STATUS==2:
     pass
 
 
-
-
-
-
 #%% Commit data to database and close up
-conn.commit()
-conn.close()
+database.conn.commit()
+database.conn.close()

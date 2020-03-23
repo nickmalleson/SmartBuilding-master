@@ -156,7 +156,7 @@ def plot_from_database(time=None, room_numbers=None):
 smart_building = scrp.Scraper()
 
 # Connect to the database (creates a Connection object)
-conn = sqlite3.connect("./database.db")
+conn = sqlite3.connect("../database/database.db")
 
 # Create a cursor to operate on the database
 c = conn.cursor()
