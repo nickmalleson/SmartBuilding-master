@@ -52,8 +52,9 @@ CREATE TABLE sensor_readings(
 	sensorlocation VARCHAR(255),
 	temperature FLOAT,
 	timestamputc VARCHAR(255),
+	timestampms INTEGER, -- THIS IS TIME OF SENSOR READING
 	voc INTEGER,
-	time INT NOT NULL, --the time of the reading is stored as an INT (unix epoch) and cannot be empty
+	time INT NOT NULL, --THIS IS TIME OF CALL, NOT TIME OF READING the time of the reading is stored as an INT (unix epoch) and cannot be empty 
 	FOREIGN KEY (sensorlocation) REFERENCES sensors(sensor_id)
 );
 
