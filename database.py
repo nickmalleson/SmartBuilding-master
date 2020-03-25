@@ -1,4 +1,4 @@
-lk a# Code to create, add to and retrieve from an sqlite database
+# Code to create, add to and retrieve from an sqlite database
 # It requires the packages:
 #   - 'pyodbc' which contains general functions for connecting to databases
 #   - 'sqlite' which has sqlite drivers specifically (SQLite is the database we'll use)
@@ -18,7 +18,7 @@ import pandas as pd
 # 0 (default) just get latest data from AIP
 # 1 get all data available
 # 2 get all data from a particular time point (specified on command line)
-STATUS = 1
+STATUS = 0
 
 #%%
 class Database():
@@ -63,6 +63,7 @@ class Database():
                                             'FROM sensor_readings '\
                                             'ORDER BY timestamputc;',     
                                             self.conn)
+            ##TODO: This check does not currently function properly or check the right thing
             if any(existing_readings.applymap(type)==bytes):
                 print("Database contains timestamps in 'bytes' format when they "\
                         "should be int64.")
@@ -152,13 +153,13 @@ class Database():
                 #%% continue if already a sensor reading in database with same time index
                 if self.check_for_duplicates(row) == 1:
                    duplicates +=1
-                   n_rows_skipped = row_num+1
-                   print('The first {} row(s) were skipped for sensor {}, as sensor reading(s) '\
-                         'already existed for that time.'
-                         .format(n_rows_skipped,row['sensornumber']))
-                   break
-            
+                   continue
+
                 self.insert_row(row)
+
+            print('{} duplicate readings sensor readings not inserted for sensor {}.'
+                  .format(duplicates,row['sensornumber']))
+
 
 
     def find_earliest_time(self):
@@ -223,8 +224,13 @@ database = Database()
 # sensor_reading_latest_data, all_sensor_numbers = database.smart_building.sensor_reading_latest()
 # database.insert_sensor_readings_latest(sensor_reading_latest_data)
 
-# Declare scraper instance
-# smart_building = scrp.Scraper()
+
+
+# get 1000 rows of data after a certain time for each sensor. Put in database
+# 1584835200000 = Sun Mar 22 2020 00:00:00
+# sensor_reading_after_data, all_sensor_numbers = \
+#       database.smart_building.sensor_reading_after(timestamp_epoch_millisec=1584835200000)
+# database.insert_sensor_readings_after(sensor_reading_after_data)
 
 
 #%% 
@@ -270,18 +276,13 @@ except Exception as e:
 
 #%% Collect sensor readings and put them into database
     
-# get 1000 rows of data after a certain time for each sensor. Put in database
-# 1546300800000 = Tue Jan 01 2019 00:00:00
-# sensor_reading_after_data, all_sensor_numbers = \
-#      smart_building.sensor_reading_after(timestamp_epoch_millisec=1546300800000)
-# insert_sensor_readings_after(sensor_reading_after_data)
 
 # get the latest 1 row of data from each sensor. Put in database
 # sensor_reading_latest_data, all_sensor_numbers = database.smart_building.sensor_reading_latest()
 # database.insert_sensor_readings_latest(sensor_reading_latest_data)
 
 # # populate from certain time 1584662400000. Input in ISO format: Fri Mar 20 2020 00:00:00
-# database.populate_from(1584662400000)
+database.populate_from(1584316800000)
 #
 
 if STATUS==1:
