@@ -18,6 +18,23 @@ import time
 import datetime as dt
 
 
+class Database():
+    '''Obtains login details and stores data associated with the account in co-
+    stant variables.
+    '''
+
+    def __init__(self):
+            self.sensor_location_info = self.get_table_info('sensors', 'sensor_number')
+            print("Sensor locations retrieved successfully.")
+            self.room_info = self.get_table_info('rooms', 'room_number')
+            print("Room information retrieved successfully.")
+
+    def get_table_info(self,table, index_col):
+        dataframe = pd.read_sql('select * from {};'.format(table), conn)
+        dataframe = dataframe.set_index(index_col)
+        return(dataframe)
+
+
 def time_now():
     ''' Get the current time as ms time epoch'''
     return(int(round(time.time() * 1000)))
@@ -74,12 +91,11 @@ def build_param_string(parameters):
 
 
 def build_values_string(values):
-    
+
     values_string = 'WHERE timestampms BETWEEN ? AND ? AND sensor_number = ? '
 
-    
     if isinstance(values, int):
-        return(values_string)
+       return(values_string)
     else:
         for i in range(1,len(values)):
             values_string = values_string + 'OR timestampms BETWEEN ? AND ? AND sensor_number = ? ' 
@@ -97,8 +113,6 @@ def retrieve_data(sensor_numbers, time_from=1580920305102, time_to=time_now(), p
 
     param_list = ['occupancy', 'voc', 'co2', 'temperature', 'pressure', \
                   'humidity', 'lux', 'noise']
-
-    # parameters = ['occupancy', 'voc', 'co2']
 
     if parameters is None:
         parameters = param_list
@@ -123,7 +137,7 @@ def retrieve_data(sensor_numbers, time_from=1580920305102, time_to=time_now(), p
                                'FROM sensor_readings '\
                                '{}'\
                                'ORDER BY timestamputc;' .format(param_string, value_string), \
-                               conn, params=sql_params)
+                             conn, params=sql_params  )
 
     if data_to_plot.empty:
         print('No data for this time range for sensor number {}.'.format(sensor_numbers))
@@ -196,124 +210,64 @@ def plot_from_dataframe(data_to_plot=None, room_number=None, overlay=0, aggregat
                           smart_building.room_info['name'].loc[room_number]))
 
 
-
-    stophere = 1
-    
-    for city,color in [('Asia Pacific', 'Green'), ('EMEA', 'Red'), ('rest', 'Blue')]:
-        x = test3.loc[test3['Lenovo Global Region']==city]['Apr_2015_to_Mar_2016_[kWh]']
-        y = test3.loc[test3['Lenovo Global Region']==city]['Apr_2015_to_Mar_2016_[MT]']
-        area= (y/x)*500000
-        plt.scatter(x, y, alpha=0.6,c=color,s=area, label=city)
-    plt.legend()
-
-
-    # param = paramlabels[7]
-    # sensor_number = sensor_numbers[0]
-
-    # https://matplotlib.org/3.1.1/api/_as_gen/matplotlib.axes.Axes.plot.html
-    color=['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
-    marker=['.', ',', 'o', 'v', '^', '<', '>', '1', '2', '3',\
-            '4', 's', 'p', '*', 'h', 'H', '+', 'x', 'D', 'd', '|', '_']
-    
+    #%% THIS WORKS AND ARE PROBABLY FOR BEST ONES
     sensor_numbers = list(set(data_to_plot['sensor_number']))
     sensor_names = list(smart_building.sensor_location_info['name'])
+    fontsizeL = 18
+    fontszieS = 16
+    
+    pause = 1
 
-    # declare the subplot variables    
-    fig, ax = plt.subplots(len(paramlabels))
+    fig, axes = plt.subplots(len(paramlabels),  figsize=(15, 15), sharex=True)
 
-    data_to_plot[param].plot(kind='line',x='name',y='num_children',
-                             
-                             color=color
-                             ax=ax)
-
-df.plot(kind='line',x='name',y='num_pets', color='red', ax=ax)
-
-plt.show()
-    plt.show()
-
-
-
-    # set one axes for each parameter
-    for i, param in enumerate(paramlabels):
-        ax[i].plot(data_to_plot[param].index, data_to_plot[param]), color[i],
-            # label=sensor_names,
-            #        marker='.', 
-            #        alpha=0.5,
-            #        linewidth=1,
-            #        markersize=2.5)
-            # ax[i].set_ylabel(plotlabels[i], rotation='horizontal',
-            #                  fontsize=10, ha='right', va='baseline')
+    if len(paramlabels)== 1:
+        axes = [axes]
         
-    # ax.set_title('A single plot')
-    # plt.legend()
-    plt.show()
+    for j in range(0,len(paramlabels)):
+        for i, sensor_number in enumerate(sensor_numbers, start=0):
+            axes[j].plot(data_to_plot[paramlabels[j]].loc[\
+                            data_to_plot['sensor_number']==sensor_number],\
+                                                marker='.', alpha=0.5,
+                                                linewidth=1.5,
+                                                markersize=6)
+            axes[j].set_ylabel(plotlabels[j], rotation='horizontal',
+                       ha='right', va='baseline', fontsize=fontsizeL, wrap=True)
 
 
-    plt.xlabel('Time')
-    locator = mdates.AutoDateLocator(minticks=8, maxticks=14)
+    # axes = [plt.gca()]
+    pos1 = axes[0].get_position() # get the original position 
+    # pos2 = [pos1.x0, pos1.y0,  pos1.width*0.5, pos1] 
+    # # axes = plt.gca()
+    
+    # defaults: left = 0.125  ight = 0.9
+    plt.subplots_adjust(left=0.125, right=0.75)
+    # working ones: plt.subplots_adjust(left=0.125, right=0.8)
+    # axes.set_position(pos2) # set a new position
+
+    # box = axes[0].get_position()
+    # axes.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+
+    leg = axes[0].legend(sensor_names, frameon=False, fontsize=fontsizeL, markerscale = 3,\
+                     bbox_to_anchor=(1, 1))
+        # , loc='upper left')
+        
+                     # , borderaxespad=0., loc='upper left', bbox_to_anchor=(1, plt.y1), loc=2, borderaxespad=0.)
+                    #was 9.5
+                    
+    for line in leg.get_lines():
+        line.set_linewidth(3)
+
+    plt.xlabel('Time', fontsize=fontsizeL)
+    plt.rcParams.update({'font.size': fontszieS})
+
+    locator = mdates.AutoDateLocator(minticks=4, maxticks=8)
     formatter = mdates.ConciseDateFormatter(locator)
-    ax.xaxis.set_major_locator(locator)
-    ax.xaxis.set_major_formatter(formatter)
-    plt.show()
+    axes[-1].xaxis.set_major_locator(locator)
+    axes[-1].xaxis.set_major_formatter(formatter)
 
+    # fig.savefig('../Plots/aaa.png', aspect='auto', dpi=fig.dpi)
+    fig.savefig('../Plots/aaa.png', dpi=500)
 
-
-
-
-
-
-
-
-    axes = data_to_plot[param].plot(marker='.', alpha=0.5,
-                                                figsize=(12, 26),
-                                                subplots=True,
-                                                linewidth=1,
-                                                markersize=2.5,
-                                                title=axtitle)
-
-
-
-
-    
-                            
-    sensor_numbers = list(set(data_to_plot['sensor_number']))
-    for i, sensor_number in enumerate(sensor_numbers, start=0):
-        plt.plot(data_to_plot[param].loc[data_to_plot['sensor_number']==sensor_number])
-        print(data_to_plot[param].loc[data_to_plot['sensor_number']==sensor_number])
-    plt.show()
-    
-    axes = data_to_plot[param].plot(marker='.', alpha=0.5,
-                                                figsize=(12, 26),
-                                                subplots=True,
-                                                linewidth=1,
-                                                markersize=2.5,
-                                                title=axtitle)
-
-
-
-
-
-
-
-    
-    # axes = data_to_plot[paramlabels].plot(marker='.', alpha=0.5,
-    #                                             figsize=(12, 26),
-    #                                             subplots=True,
-    #                                             linewidth=1,
-    #                                             markersize=2.5,
-    #                                             title=axtitle)
-    dundis = 1
-    
-    for i, ax in enumerate(axes, start=0):
-        ax.set_ylabel(plotlabels[i], rotation='horizontal',
-                      fontsize=10, ha='right', va='baseline')
-    
-    
-    plt.xlabel('Time')
-    locator = mdates.AutoDateLocator(minticks=8, maxticks=14)
-    formatter = mdates.ConciseDateFormatter(locator)
-    ax.xaxis.set_major_locator(locator)
-    ax.xaxis.set_major_formatter(formatter)
     plt.show()
 
 
@@ -602,7 +556,7 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
         return()
 
     if overlay==1:
-         data_to_plot = retrieve_data(sensor_numbers, time_from, time_to)
+         data_to_plot = retrieve_data(sensor_numbers, time_from, time_to, parameters=parameters)
          sorted_data = data_to_plot.sort_values(by=['sensor_number', 'timestampms'])
          plot_from_dataframe(sorted_data)
 
@@ -633,14 +587,17 @@ conn = sqlite3.connect("../database/database.db")
 # Create a cursor to operate on the database
 c = conn.cursor()
 
+# Create class instance to get info so scraper does not have to be called
+database = Database()
+
 # plot_from_database(sensor_numbers=6, time_from=1583020800000, \
                    # time_to = 1583107200000, parameters='occupancy')
 
 # plot_from_database(parameters='occupancy')
 
     
-plot_from_database(time_from=1583193600000, \
-                   time_to = 1583280000000, overlay=1)
+plot_from_database(overlay=1, time_from=1583280000000, \
+                   time_to = 1583366400000, parameters=['occupancy', 'noise'])
 
 # plot_from_database()
 
