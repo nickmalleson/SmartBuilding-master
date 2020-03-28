@@ -35,22 +35,6 @@ def make_empty_list(length):
         list_for_output.append([])
     return(list_for_output)
 
-#%%
-def get_login_info():
-    ''' Get login username and password from locally stored parameter file.'''
-
-    # Look in the folder in the directory above the present working directory
-    parameter_file_path = './SmartBuildingParameters/'
-    parameter_file_name = 'SmartBuildingParameters.txt'
-    parameter_file = open(parameter_file_path + parameter_file_name)
-    params = {}
-    for line in parameter_file:
-        line = line.strip()
-        key_value = line.split(' = ')
-        params[key_value[0].strip()] = key_value[1].strip()
-    username = params['username']
-    password = params['password']
-    return(username, password)
 
 #%%
 def get_values_and_indexes(dataframe, column_name='name'):
@@ -166,14 +150,14 @@ class Scraper():
 
 
         if auto:
-            username, password = get_login_info()
+            username, password = Scraper._get_login_info()
 
         else: # Otherwise prompt to enter username or press enter to use saved details
             username = input(
                 "Enter username or press enter to log in as 'yanjiedong':")
             # if enter was pressed use saved username and password
             if username == '':
-                username, password = get_login_info()
+                username, password = Scraper._get_login_info()
             else:
                 # Enter password manually. Password is hidden but only in external
                 # console if using Spyder.'''
@@ -200,6 +184,23 @@ class Scraper():
         
         # If here then we weren't able to log on.
         raise Exception('Problem logging in. The respone code is {} (200 is success)'.format(responsecheck))
+
+    @staticmethod
+    def _get_login_info():
+        ''' Get login username and password from locally stored parameter file.'''
+
+        # Look in the folder in the directory above the present working directory
+        parameter_file_path = './SmartBuildingParameters/'
+        parameter_file_name = 'SmartBuildingParameters.txt'
+        parameter_file = open(parameter_file_path + parameter_file_name)
+        params = {}
+        for line in parameter_file:
+            line = line.strip()
+            key_value = line.split(' = ')
+            params[key_value[0].strip()] = key_value[1].strip()
+        username = params['username']
+        password = params['password']
+        return (username, password)
         
 
     def _call_API(self, function_name):
