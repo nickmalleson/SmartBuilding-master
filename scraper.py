@@ -21,108 +21,6 @@ import time
 import datetime as dt
 from dateutil.parser import parse
 
-
-#%%
-def time_now():
-    ''' Get the current time as ms time epoch'''
-    return(int(round(time.time() * 1000)))
-
-#%%
-def make_empty_list(length):
-    ''' Returns an empty list of length 'length'''
-    list_for_output = []
-    for index in range(0, length):
-        list_for_output.append([])
-    return(list_for_output)
-
-#%%
-def get_login_info():
-    ''' Get login username and password from locally stored parameter file.'''
-
-    # Look in the folder in the directory above the present working directory
-    parameter_file_path = '../SmartBuildingParameters/'
-    parameter_file_name = 'SmartBuildingParameters.txt'
-    parameter_file = open(parameter_file_path + parameter_file_name)
-    params = {}
-    for line in parameter_file:
-        line = line.strip()
-        key_value = line.split(' = ')
-        params[key_value[0].strip()] = key_value[1].strip()
-    username = params['username']
-    password = params['password']
-    return(username, password)
-
-#%%
-def get_values_and_indexes(dataframe, column_name='name'):
-    ''' Returns lists of values from coloumn_name in dataframe and corresponding index numbers.'''
-    
-    value_nums = list(dataframe.index)
-    value_strings = list(dataframe[column_name])
-    return(value_nums, value_strings)
-
-#%%
-def choose_by_number(dataframe):
-    ''' Takes user input to choose from a list using the index column name.
-
-    Parameters
-    ----------
-    dataframe: panda dataframe
-        The dataframe from the Scraper() object (e.g. scraper.room_info) from which to choose.
-
-    Returns
-    -------
-    chosen_numbers: list of ints
-        List of numbers corresponding to chosen names.
-    chosen_names: list of strings
-        List of names corresponding to chosen numbers.
-    '''
-    list_description=dataframe.index.name
-    list_of_numbers, list_of_names = get_values_and_indexes(dataframe)
-
-    if len(list_of_numbers) == 1:
-        chosen_numbers = list_of_numbers
-        chosen_names = list_of_names
-        print('Only one {} available, so number {}: \'{}\' was selected '
-              'by default.' .format(list_description,
-                                    chosen_numbers[0],
-                                    list_of_names[0]))
-        return(chosen_numbers, chosen_names)
-
-    print("\nAvailable:")
-    for number, name in zip(list_of_numbers, list_of_names):
-        print("{} {}: {}.".format(list_description, number, name))
-
-    chosen_numbers = input(
-        'Choose by number. Use the format:\n \'1\' for single, \'1, 2, 3\''
-        'for multiple, or press enter for all.\n Use \'range()\' to return a '
-        'list (e.g.\'range(3,6)\' returns \'3,4,5\'):\n>>')
-
-    if not chosen_numbers:
-        chosen_numbers = list_of_numbers
-        chosen_names = list_of_names
-    else:
-        chosen_names = []
-        chosen_numbers = eval(chosen_numbers)
-
-        if isinstance(chosen_numbers, int):
-            chosen_numbers = [chosen_numbers]
-        elif isinstance(chosen_numbers, range) or \
-                isinstance(chosen_numbers, tuple):
-            chosen_numbers = list(chosen_numbers)
-
-        for number in chosen_numbers:
-            if number not in list_of_numbers or number <= 0:
-                sys.exit('\nBad index number {}.' .format(number))
-            else:
-                chosen_names.append(list_of_names[list_of_numbers.index(number)])
-
-    print('\nChosen:')
-    for (number, name) in zip(chosen_numbers, chosen_names):
-        print('{} {}: {}.'.format(list_description, number, name))
-
-    return(chosen_numbers, chosen_names)
-
-#%%
 class Scraper():
     '''Obtains login details and stores data associated with the account in co-
     stant variables.
@@ -166,14 +64,14 @@ class Scraper():
 
 
         if auto:
-            username, password = get_login_info()
+            username, password = Scraper._get_login_info()
 
         else: # Otherwise prompt to enter username or press enter to use saved details
             username = input(
                 "Enter username or press enter to log in as 'yanjiedong':")
             # if enter was pressed use saved username and password
             if username == '':
-                username, password = get_login_info()
+                username, password = Scraper._get_login_info()
             else:
                 # Enter password manually. Password is hidden but only in external
                 # console if using Spyder.'''
@@ -196,10 +94,28 @@ class Scraper():
             print('Login successful.\nBuilding info aquired successfully '\
                   'from {} building(s). First building: {}.' 
                   .format(len(building_info), building_info['name'].loc[1]))
+            return(username, password, building_info)
+        
+        # If here then we weren't able to log on.
+        raise Exception('Problem logging in. The respone code is {} (200 is success)'.format(responsecheck))
 
-        else:
-            print('Page not found or no building associated with account.')
-        return(username, password, building_info)
+    @staticmethod
+    def _get_login_info():
+        ''' Get login username and password from locally stored parameter file.'''
+
+        # Look in the folder in the directory above the present working directory
+        parameter_file_path = './SmartBuildingParameters/'
+        parameter_file_name = 'SmartBuildingParameters.txt'
+        parameter_file = open(parameter_file_path + parameter_file_name)
+        params = {}
+        for line in parameter_file:
+            line = line.strip()
+            key_value = line.split(' = ')
+            params[key_value[0].strip()] = key_value[1].strip()
+        username = params['username']
+        password = params['password']
+        return (username, password)
+        
 
     def _call_API(self, function_name):
         """Call the API, inserting 'function_name' into the URL. E.g.:
@@ -313,7 +229,7 @@ class Scraper():
         enough to get 1000 data points for each sensor. '''
         if timestamp_epoch_millisec is None:
             ##TODO: UNCOMMENT NEXT LINE, DELETE LINE BELOW
-            # timestamp_epoch_millisec = time_now()-66000000
+            # timestamp_epoch_millisec = Scraper._time_now()-66000000
             timestamp_epoch_millisec = 1583243183
 
         # Convert input time to ISO format
@@ -381,8 +297,8 @@ class Scraper():
         
         # try the API call for the current building, except if fails
         try:
-            ''' the 'managed_space_latest_data' variable will not include non-responsive sensors so will 
-            return a list shorter than total number of sensors in self.managed_space_info'''
+            #the 'managed_space_latest_data' variable will not include non-responsive sensors so will
+            #return a list shorter than total number of sensors in self.managed_space_info
             managed_space_latest_data = self._call_API(function_name)
                         # if the API call fails, state this and move to next
         except Exception as e:
@@ -452,11 +368,11 @@ class Scraper():
             if i not in all_sensor_numbers: 
                 sys.exit('\nBad index in input list: {}. Check self.sensor_location_info for list.'.format(str(i)))
 
-        """ Default time is 1100 minutes from when call was made. This is usually
-        enough to get 1000 data points for each sensor. """
+        #Default time is 1100 minutes from when call was made. This is usually
+        #enough to get 1000 data points for each sensor.
         if timestamp_epoch_millisec is None:
             ##TODO: UNCOMMENT NEXT LINE, DELETE LINE BELOW
-            # timestamp_epoch_millisec = time_now()-66000000
+            # timestamp_epoch_millisec = Scraper._time_now()-66000000
             timestamp_epoch_millisec = 1583020800000
 
         # Convert input time to ISO format
@@ -516,7 +432,6 @@ class Scraper():
 
         return(sensor_reading_after_data, sensor_locations)
 
-#%%
     def sensor_reading_latest(self, building_number=1):
         ''' Get latest sensor readings from sensor locations of (default) building number 1. 
         Since the API call returns a list which excludes non-responsive sensors, 
@@ -570,7 +485,7 @@ class Scraper():
         # add 'name' column for room name
         sensor_reading_latest['name'] = self.sensor_location_info['name'].loc[sensor_reading_latest['sensornumber']]
         
-        ''' check for missing spaces and print names and numbers if one is found'''
+        # Check for missing spaces and print names and numbers if one is found
         for i in all_possible_sensor_numbers: 
             if i not in returned_sensor_numbers: 
                 print('Sensor number {}: {}. NO DATA RETURNED.'
@@ -581,7 +496,6 @@ class Scraper():
 
         return(sensor_reading_latest, returned_sensor_numbers)
 
-#%%
     def plot_managed_spaces(self, managed_spaces=None,
                             managed_space_after_data=None):
         ''' Plot managed space data. Data from all managed spaces plotted onto one
@@ -659,7 +573,6 @@ class Scraper():
         except:
             sys.exit('Could not plot - faulty sensor or no data returned')
 
-#%%
     def plot_sensor_reading_after(self, sensor_numbers=None,
                                   sensor_reading_after_data=None):
         ''' Plot sensor data (after). Data from each sensor are plotted on
@@ -747,19 +660,102 @@ class Scraper():
                 ax.xaxis.set_major_formatter(formatter)
                 plt.show()
 
-#%%
-def print_attributes(obj):
-    ''' Print attributes of class object 'obj'.
+    @staticmethod
+    def _time_now():
+        ''' Get the current time as ms time epoch'''
+        return (int(round(time.time() * 1000)))
 
-    Parameters
-    ----------
-    ojb: class object
+    @staticmethod
+    def _make_empty_list(length):
+        ''' Returns an empty list of length 'length'''
+        list_for_output = []
+        for index in range(0, length):
+            list_for_output.append([])
+        return (list_for_output)
 
-    Returns
-    -------
-    Prints attributes of 'obj'
-    '''
+    @staticmethod
+    def _get_values_and_indexes(dataframe, column_name='name'):
+        ''' Returns lists of values from coloumn_name in dataframe and corresponding index numbers.'''
 
-    print('\nAttributes:\n')
-    for attr in vars(obj):
-        print("{}: {}\n" .format(attr, getattr(obj, attr)))
+        value_nums = list(dataframe.index)
+        value_strings = list(dataframe[column_name])
+        return (value_nums, value_strings)
+
+    @staticmethod
+    def _choose_by_number(dataframe):
+        ''' Takes user input to choose from a list using the index column name.
+
+        Parameters
+        ----------
+        dataframe: panda dataframe
+            The dataframe from the Scraper() object (e.g. scraper.room_info) from which to choose.
+
+        Returns
+        -------
+        chosen_numbers: list of ints
+            List of numbers corresponding to chosen names.
+        chosen_names: list of strings
+            List of names corresponding to chosen numbers.
+        '''
+        list_description = dataframe.index.name
+        list_of_numbers, list_of_names = Scraper._get_values_and_indexes(dataframe)
+
+        if len(list_of_numbers) == 1:
+            chosen_numbers = list_of_numbers
+            chosen_names = list_of_names
+            print('Only one {} available, so number {}: \'{}\' was selected '
+                  'by default.'.format(list_description,
+                                       chosen_numbers[0],
+                                       list_of_names[0]))
+            return (chosen_numbers, chosen_names)
+
+        print("\nAvailable:")
+        for number, name in zip(list_of_numbers, list_of_names):
+            print("{} {}: {}.".format(list_description, number, name))
+
+        chosen_numbers = input(
+            'Choose by number. Use the format:\n \'1\' for single, \'1, 2, 3\''
+            'for multiple, or press enter for all.\n Use \'range()\' to return a '
+            'list (e.g.\'range(3,6)\' returns \'3,4,5\'):\n>>')
+
+        if not chosen_numbers:
+            chosen_numbers = list_of_numbers
+            chosen_names = list_of_names
+        else:
+            chosen_names = []
+            chosen_numbers = eval(chosen_numbers)
+
+            if isinstance(chosen_numbers, int):
+                chosen_numbers = [chosen_numbers]
+            elif isinstance(chosen_numbers, range) or \
+                    isinstance(chosen_numbers, tuple):
+                chosen_numbers = list(chosen_numbers)
+
+            for number in chosen_numbers:
+                if number not in list_of_numbers or number <= 0:
+                    sys.exit('\nBad index number {}.'.format(number))
+                else:
+                    chosen_names.append(list_of_names[list_of_numbers.index(number)])
+
+        print('\nChosen:')
+        for (number, name) in zip(chosen_numbers, chosen_names):
+            print('{} {}: {}.'.format(list_description, number, name))
+
+        return (chosen_numbers, chosen_names)
+
+    @staticmethod
+    def _print_attributes(obj):
+        ''' Print attributes of class object 'obj'.
+
+        Parameters
+        ----------
+        ojb: class object
+
+        Returns
+        -------
+        Prints attributes of 'obj'
+        '''
+
+        print('\nAttributes:\n')
+        for attr in vars(obj):
+            print("{}: {}\n" .format(attr, getattr(obj, attr)))

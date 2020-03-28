@@ -10,15 +10,11 @@
 #    sqlite3 database.db < create_database.sql
 
 import sqlite3
-import scraper as scrp
+from scraper import Scraper
 import os
 import pandas as pd
+import argparse
 
-# What the script is going to do
-# 0 (default) just get latest data from AIP
-# 1 get all data available
-# 2 get all data from a particular time point (specified on command line)
-STATUS = 0
 
 #%%
 class Database():
@@ -27,31 +23,28 @@ class Database():
 
     def __init__(self):
             
-        self.conn, self.c = Database._connect_to_database(self)        
+        self.conn, self.c = Database._connect_to_database()        
         self.existing_readings = Database._retrieve_existing_readings(self)
-        self.smart_building = scrp.Scraper()
+        self.smart_building = Scraper()
 
 
     @staticmethod
-    def _connect_to_database(self):
+    def _connect_to_database():
         ##TODO: DODGY USE OF GLOBAL VARIABLES WHILST TESTING. NEEDS SORTING OUT
         # Connect to the database (creates a Connection object)
         # global conn, c
     
-        try:
-            # global conn, c
+        # global conn, c
+
+        # connect to database
+        conn = sqlite3.connect("./database.db")
     
-            # connect to database
-            conn = sqlite3.connect("../database/database.db")
-        
-            # Create a cursor to operate on the database
-            c = conn.cursor()
-        except Exception as e:
-                print('Error: ', e)
+        # Create a cursor to operate on the database
+        c = conn.cursor()
         return(conn, c)
+      
  
     
-    @staticmethod
     def _retrieve_existing_readings(self):
         '''Obtains details of existing database entries to check against.
         Returns a dataframe containing a list of existing time readings and
@@ -70,12 +63,6 @@ class Database():
             return(existing_readings)
         except Exception as e:        
             print("Error: ", e)       
-
-
-    def restart(self):
-        print("Connection error, restarting kernel...")
-        os._exit(00)
-        self.connect_to_database()    
 
 
     def insert_row(self, row):
@@ -187,7 +174,7 @@ class Database():
         earliest_time, sensor_reading_after_data = self.find_earliest_time()
     
         # put current time into variable
-        time_now = scrp.time_now()
+        time_now = Scraper.time_now()
         
         # insert the first time
         self.insert_sensor_readings_after(sensor_reading_after_data)
@@ -205,8 +192,8 @@ class Database():
         is an integer ms time epoch. API calls are made in steps of 1000 minutes. '''
     
         # get current time
-        time_now = scrp.time_now()   
-        
+        time_now = Scraper._time_now()
+
         # in steps of 1000 minutes, call API to retrieve data and insert into database.
         # Note: typical interval between sensor reading is 1 minute, API call returns max 1000 rows.
         for input_time in range(time_from, time_now, 60000000):
@@ -214,83 +201,97 @@ class Database():
                 database.smart_building.sensor_reading_after(timestamp_epoch_millisec=input_time)
             self.insert_sensor_readings_after(sensor_reading_after_data)
 
+    def __del__(self):
+        '''Destructor commits any remaining data to the database and closes the connection'''
+        print("Closing connection to the databae")
+        self.conn.commit()
+        self.conn.close()
+
+
+
+
 
 #%% Program starts here
+if __name__ == '__main__':
 
-# Connect to the database
-# os._exit(00)
-database = Database()
+    # Parse command line arguments. Currently three options (must choose one):
+    #  - recent: get the latest data from the API
+    #  - all : get all available data from the API
+    #  - from: get all data from a certain point
+    parser = argparse.ArgumentParser()
 
-# sensor_reading_latest_data, all_sensor_numbers = database.smart_building.sensor_reading_latest()
-# database.insert_sensor_readings_latest(sensor_reading_latest_data)
+    # The 'group' means that only one argument can be called. One of these is required
+    group = parser.add_mutually_exclusive_group(required = True)
 
+    # Get latest data, will store parser.recent=True to incidate that this parameter has ben set
+    group.add_argument('-r', '--recent', dest='recent', action='store_true',
+                       help="Get the most recent data from the API" )
 
+    # Get all available data
+    group.add_argument('-a', '--all', dest='all', action='store_true',
+                           help="Get all available data from the API")
 
-# get 1000 rows of data after a certain time for each sensor. Put in database
-# 1584835200000 = Sun Mar 22 2020 00:00:00
-# sensor_reading_after_data, all_sensor_numbers = \
-#       database.smart_building.sensor_reading_after(timestamp_epoch_millisec=1584835200000)
-# database.insert_sensor_readings_after(sensor_reading_after_data)
+    # Get data from a time point. This needs an additional argument: time to get from
+    group.add_argument('-f', '--from', dest='_from', nargs=1, type=int,
+                       help="Get all data from a certain point")
 
+    # Parse the command line arguments
+    args = parser.parse_args()
 
-#%% 
-'''Try to add data for building, room, and sesnor info. Will skip if same data 
-already exists in database. '''
+    try:
+        # Connect to the database
+        database = Database()
 
+        if args.recent:
+            print("Getting most recent data from the API")
+            database.populate_from(Scraper._time_now())
 
-#building_info
-try:
-    for i, row in database.smart_building.building_info.iterrows():
-        database.c.execute('INSERT INTO buildings (building_id, building_number, '\
-                  'building_name) VALUES(?,?,?)', 
-                  [row['id'], i, row['name']])
-except Exception as e:
-    if str(e) == 'database is locked':
-        print('Database is locked. Trying to reconnect to database... ')
-        database.restart()             
-    else:  
-        print('Error: ', e)
+        elif args.all:
+            print("Getting all data from the api")
+            database.populate_database();
 
+        elif args._from:
+            time_from = args._from[0]
+            print("Getting all data from time point {}", time_from)
+            database.populate_from(time_from)
 
-#room_info
-try:    
-    for i, row in database.smart_building.room_info.iterrows():    
-        database.c.execute('INSERT INTO rooms (room_id, room_number, room_name, '\
-                  'building_id, building_name) '\
-                  'VALUES(?,?,?,?,?)', [row['id'], i, row['name'], \
-                                        row['building'], row['buildingname']])
-except Exception as e:
-    print("Error: ", e)
+        else:
+            raise Exception("No arguments provided! Should not have gotten here.")
 
+        # # get 1000 rows of data after a certain time for each sensor. Put in database
+        # # 1584835200000 = Sun Mar 22 2020 00:00:00
+        # # sensor_reading_after_data, all_sensor_numbers = \
+        # #       database.smart_building.sensor_reading_after(timestamp_epoch_millisec=1584835200000)
+        # # database.insert_sensor_readings_after(sensor_reading_after_data)
+        #
+        #
+        # #%%
+        # #Try to add data for building, room, and sesnor info. Will skip if same data
+        # #already exists in database
+        #
+        # #building_info
+        # for i, row in database.smart_building.building_info.iterrows():
+        #     database.c.execute('INSERT INTO buildings (building_id, building_number, '\
+        #               'building_name) VALUES(?,?,?)',
+        #               [row['id'], i, row['name']])
+        #
+        #
+        # #room_info
+        # for i, row in database.smart_building.room_info.iterrows():
+        #     database.c.execute('INSERT INTO rooms (room_id, room_number, room_name, '\
+        #               'building_id, building_name) '\
+        #               'VALUES(?,?,?,?,?)', [row['id'], i, row['name'], \
+        #                                     row['building'], row['buildingname']])
+        #
+        #
+        # #sensor_info
+        # for i, row in database.smart_building.sensor_location_info.iterrows():
+        #     database.c.execute('INSERT INTO sensors (sensor_id, sensor_number, sensor_name, '\
+        #               'room_id, room_name) '\
+        #               'VALUES(?,?,?,?,?)', [row['id'], i, row['name'], row['room'], \
+        #                                     row['roomname']])
 
-#sensor_info
-try:
-    for i, row in database.smart_building.sensor_location_info.iterrows():    
-        database.c.execute('INSERT INTO sensors (sensor_id, sensor_number, sensor_name, '\
-                  'room_id, room_name) '\
-                  'VALUES(?,?,?,?,?)', [row['id'], i, row['name'], row['room'], \
-                                        row['roomname']])
-except Exception as e:
-    print("Error: ", e)
-
-
-#%% Collect sensor readings and put them into database
-    
-
-# get the latest 1 row of data from each sensor. Put in database
-# sensor_reading_latest_data, all_sensor_numbers = database.smart_building.sensor_reading_latest()
-# database.insert_sensor_readings_latest(sensor_reading_latest_data)
-
-# # populate from certain time 1584662400000. Input in ISO format: Fri Mar 20 2020 00:00:00
-database.populate_from(1584316800000)
-#
-
-if STATUS==1:
-    database.populate_database()
-elif STATUS==2:
-    pass
-
-
-#%% Commit data to database and close up
-database.conn.commit()
-database.conn.close()
+    finally:
+        # Whatever happens, try to commit data to database and close up (unnecessary because this will
+        # happen automatically when the program finishes?)
+        del database
