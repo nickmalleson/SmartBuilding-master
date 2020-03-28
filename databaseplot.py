@@ -226,7 +226,6 @@ def plot_from_dataframe(data_to_plot=None, aggregate=0):
         # need to change dataframe for this
 
         # find which rooms sensors are in from 'Database' class
-        honestlywhythefuckwontitstopatbreakpoints = 1
         room_names = data_to_plot['room_name'].unique().tolist()
         ##TODO: may need this when not plotting overlay =1 aggregate = 1        
             # database.sensor_location_info['room_name']\
@@ -254,8 +253,6 @@ def plot_from_dataframe(data_to_plot=None, aggregate=0):
     fontsizeL = 18
     fontszieS = 16
     
-    pause = 1
-
     fig, axes = plt.subplots(len(paramlabels),  figsize=(15, 15), sharex=True)
 
     if len(paramlabels)== 1:
@@ -377,16 +374,11 @@ def aggregate_data(data_to_aggregate):
     aggregated_data['timestamputc'] = aggregated_data['timestampms'] \
         .apply(lambda t: dt.datetime.utcfromtimestamp(int(t/1000)).isoformat()+'.000001+00:00')
     # aggregated_data['timestamputc'] = aggregated_data['timestamputc'].apply(parse)
-    
-    fuckingstopheretooplase = 1
-    
+        
     aggregated_data['room_name'] = room_name
     aggregated_data['room_number'] = room_number
     aggregated_data['sensor_name'] = sensor_names_str
     aggregated_data['sensor_number'] = sensor_numbers_str
-
-
-    stop = 1
     
     return(aggregated_data)
 
@@ -579,12 +571,6 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
                     # aggregated_data.index = aggregated_data.reindex(index=range(0,len(aggregated_data)))
                     aggregated_dfs = pd.concat([aggregated_dfs, aggregated_data], axis=0)
                     # pd.merge(aggregated_dfs, aggregated_data, how='right')
-
-
-        whythefuckwhontyoufuckingstop =1 
-                            
-
-        fuckingstopherenow = 1
         try:
             aggregated_dfs = aggregated_dfs.rename_axis(None)
             sorted_data = aggregated_dfs.sort_values(by=['room_number', 'timestampms'])
