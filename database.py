@@ -10,7 +10,7 @@
 #    sqlite3 database.db < create_database.sql
 
 import sqlite3
-import scraper as scrp
+from scraper import Scraper
 import os
 import pandas as pd
 
@@ -29,7 +29,7 @@ class Database():
             
         self.conn, self.c = Database._connect_to_database()        
         self.existing_readings = Database._retrieve_existing_readings(self)
-        self.smart_building = scrp.Scraper()
+        self.smart_building = Scraper()
 
 
     @staticmethod
@@ -184,7 +184,7 @@ class Database():
         earliest_time, sensor_reading_after_data = self.find_earliest_time()
     
         # put current time into variable
-        time_now = scrp.time_now()
+        time_now = Scraper.time_now()
         
         # insert the first time
         self.insert_sensor_readings_after(sensor_reading_after_data)
@@ -202,7 +202,7 @@ class Database():
         is an integer ms time epoch. API calls are made in steps of 1000 minutes. '''
     
         # get current time
-        time_now = scrp.time_now()   
+        time_now = Scraper._time_now()
         
         # in steps of 1000 minutes, call API to retrieve data and insert into database.
         # Note: typical interval between sensor reading is 1 minute, API call returns max 1000 rows.
@@ -213,81 +213,81 @@ class Database():
 
 
 #%% Program starts here
+if __name__=="__main__":
 
-# Connect to the database
-# os._exit(00)
-database = Database()
+    # Connect to the database
+    # os._exit(00)
+    database = Database()
 
-# sensor_reading_latest_data, all_sensor_numbers = database.smart_building.sensor_reading_latest()
-# database.insert_sensor_readings_latest(sensor_reading_latest_data)
-
-
-
-# get 1000 rows of data after a certain time for each sensor. Put in database
-# 1584835200000 = Sun Mar 22 2020 00:00:00
-# sensor_reading_after_data, all_sensor_numbers = \
-#       database.smart_building.sensor_reading_after(timestamp_epoch_millisec=1584835200000)
-# database.insert_sensor_readings_after(sensor_reading_after_data)
+    # sensor_reading_latest_data, all_sensor_numbers = database.smart_building.sensor_reading_latest()
+    # database.insert_sensor_readings_latest(sensor_reading_latest_data)
 
 
-#%% 
-'''Try to add data for building, room, and sesnor info. Will skip if same data 
-already exists in database. '''
+
+    # get 1000 rows of data after a certain time for each sensor. Put in database
+    # 1584835200000 = Sun Mar 22 2020 00:00:00
+    # sensor_reading_after_data, all_sensor_numbers = \
+    #       database.smart_building.sensor_reading_after(timestamp_epoch_millisec=1584835200000)
+    # database.insert_sensor_readings_after(sensor_reading_after_data)
 
 
-#building_info
-try:
-    for i, row in database.smart_building.building_info.iterrows():
-        database.c.execute('INSERT INTO buildings (building_id, building_number, '\
-                  'building_name) VALUES(?,?,?)', 
-                  [row['id'], i, row['name']])
-except Exception as e:
-    if str(e) == 'database is locked':
-        print('Database is locked. Trying to reconnect to database... ')
-        database.restart()             
-    else:  
-        print('Error: ', e)
+    #%%
+    #Try to add data for building, room, and sesnor info. Will skip if same data
+    #already exists in database
+
+    #building_info
+    try:
+        for i, row in database.smart_building.building_info.iterrows():
+            database.c.execute('INSERT INTO buildings (building_id, building_number, '\
+                      'building_name) VALUES(?,?,?)',
+                      [row['id'], i, row['name']])
+    except Exception as e:
+        if str(e) == 'database is locked':
+            print('Database is locked. Trying to reconnect to database... ')
+            database.restart()
+        else:
+            print('Error: ', e)
 
 
-#room_info
-try:    
-    for i, row in database.smart_building.room_info.iterrows():    
-        database.c.execute('INSERT INTO rooms (room_id, room_number, room_name, '\
-                  'building_id, building_name) '\
-                  'VALUES(?,?,?,?,?)', [row['id'], i, row['name'], \
-                                        row['building'], row['buildingname']])
-except Exception as e:
-    print("Error: ", e)
+    #room_info
+    try:
+        for i, row in database.smart_building.room_info.iterrows():
+            database.c.execute('INSERT INTO rooms (room_id, room_number, room_name, '\
+                      'building_id, building_name) '\
+                      'VALUES(?,?,?,?,?)', [row['id'], i, row['name'], \
+                                            row['building'], row['buildingname']])
+    except Exception as e:
+        print("Error: ", e)
 
 
-#sensor_info
-try:
-    for i, row in database.smart_building.sensor_location_info.iterrows():    
-        database.c.execute('INSERT INTO sensors (sensor_id, sensor_number, sensor_name, '\
-                  'room_id, room_name) '\
-                  'VALUES(?,?,?,?,?)', [row['id'], i, row['name'], row['room'], \
-                                        row['roomname']])
-except Exception as e:
-    print("Error: ", e)
+    #sensor_info
+    try:
+        for i, row in database.smart_building.sensor_location_info.iterrows():
+            database.c.execute('INSERT INTO sensors (sensor_id, sensor_number, sensor_name, '\
+                      'room_id, room_name) '\
+                      'VALUES(?,?,?,?,?)', [row['id'], i, row['name'], row['room'], \
+                                            row['roomname']])
+    except Exception as e:
+        print("Error: ", e)
 
 
-#%% Collect sensor readings and put them into database
-    
-
-# get the latest 1 row of data from each sensor. Put in database
-# sensor_reading_latest_data, all_sensor_numbers = database.smart_building.sensor_reading_latest()
-# database.insert_sensor_readings_latest(sensor_reading_latest_data)
-
-# # populate from certain time 1584662400000. Input in ISO format: Fri Mar 20 2020 00:00:00
-database.populate_from(1584316800000)
-#
-
-if STATUS==1:
-    database.populate_database()
-elif STATUS==2:
-    pass
+    #%% Collect sensor readings and put them into database
 
 
-#%% Commit data to database and close up
-database.conn.commit()
-database.conn.close()
+    # get the latest 1 row of data from each sensor. Put in database
+    # sensor_reading_latest_data, all_sensor_numbers = database.smart_building.sensor_reading_latest()
+    # database.insert_sensor_readings_latest(sensor_reading_latest_data)
+
+    # # populate from certain time 1584662400000. Input in ISO format: Fri Mar 20 2020 00:00:00
+    database.populate_from(1584316800000)
+    #
+
+    if STATUS==1:
+        database.populate_database()
+    elif STATUS==2:
+        pass
+
+
+    #%% Commit data to database and close up
+    database.conn.commit()
+    database.conn.close()
