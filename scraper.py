@@ -297,8 +297,8 @@ class Scraper():
         
         # try the API call for the current building, except if fails
         try:
-            ''' the 'managed_space_latest_data' variable will not include non-responsive sensors so will 
-            return a list shorter than total number of sensors in self.managed_space_info'''
+            #the 'managed_space_latest_data' variable will not include non-responsive sensors so will
+            #return a list shorter than total number of sensors in self.managed_space_info
             managed_space_latest_data = self._call_API(function_name)
                         # if the API call fails, state this and move to next
         except Exception as e:
@@ -368,8 +368,8 @@ class Scraper():
             if i not in all_sensor_numbers: 
                 sys.exit('\nBad index in input list: {}. Check self.sensor_location_info for list.'.format(str(i)))
 
-        """ Default time is 1100 minutes from when call was made. This is usually
-        enough to get 1000 data points for each sensor. """
+        #Default time is 1100 minutes from when call was made. This is usually
+        #enough to get 1000 data points for each sensor.
         if timestamp_epoch_millisec is None:
             ##TODO: UNCOMMENT NEXT LINE, DELETE LINE BELOW
             # timestamp_epoch_millisec = Scraper._time_now()-66000000
@@ -432,7 +432,6 @@ class Scraper():
 
         return(sensor_reading_after_data, sensor_locations)
 
-#%%
     def sensor_reading_latest(self, building_number=1):
         ''' Get latest sensor readings from sensor locations of (default) building number 1. 
         Since the API call returns a list which excludes non-responsive sensors, 
@@ -486,7 +485,7 @@ class Scraper():
         # add 'name' column for room name
         sensor_reading_latest['name'] = self.sensor_location_info['name'].loc[sensor_reading_latest['sensornumber']]
         
-        ''' check for missing spaces and print names and numbers if one is found'''
+        # Check for missing spaces and print names and numbers if one is found
         for i in all_possible_sensor_numbers: 
             if i not in returned_sensor_numbers: 
                 print('Sensor number {}: {}. NO DATA RETURNED.'
