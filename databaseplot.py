@@ -18,6 +18,13 @@ import time
 import datetime as dt
 
 
+from pandas.plotting import register_matplotlib_converters
+register_matplotlib_converters()
+# warnings.warn(msg, FutureWarning)
+
+
+
+
 class Database():
     '''Obtains login details and stores data associated with the account in co-
     stant variables.
@@ -28,6 +35,8 @@ class Database():
             print("Sensor locations retrieved successfully.")
             self.room_info = self.get_table_info('rooms', 'room_number')
             print("Room information retrieved successfully.")
+            self.param_list = ['occupancy', 'voc', 'co2', 'temperature', 'pressure', \
+                               'humidity', 'lux', 'noise']
 
     def get_table_info(self,table, index_col):
         dataframe = pd.read_sql('select * from {};'.format(table), conn)
@@ -132,12 +141,15 @@ def retrieve_data(sensor_numbers, time_from=1580920305102, time_to=time_now(), p
             sql_params = sql_params + [time_from, time_to, i]
 
 
-    data_to_plot = pd.read_sql('SELECT time, timestampms, timestamputc, sensor_number, '\
+    data_to_plot = pd.read_sql('SELECT time, timestampms, timestamputc, sensor_name, sensor_number, '\
                                'sensorlocation, {} '\
                                'FROM sensor_readings '\
                                '{}'\
                                'ORDER BY timestamputc;' .format(param_string, value_string), \
                              conn, params=sql_params  )
+    
+    ##TODO: add room_number and room_name to data here to simplify later code
+
 
     if data_to_plot.empty:
         print('No data for this time range for sensor number {}.'.format(sensor_numbers))
@@ -145,7 +157,7 @@ def retrieve_data(sensor_numbers, time_from=1580920305102, time_to=time_now(), p
     return(data_to_plot)
 
 
-def plot_from_dataframe(data_to_plot=None, room_number=None, overlay=0, aggregated=0):
+def plot_from_dataframe(data_to_plot=None, aggregate=0):
     ''' Plot sensor data retrieved from database with retrieve_data(). 
     Plots all types of data from one sensor number. No upper limit on how many 
     datapoints.
@@ -154,65 +166,91 @@ def plot_from_dataframe(data_to_plot=None, room_number=None, overlay=0, aggregat
     sensor_number = int which corresponds to index in scraper.sensor_location_info.
     '''
     
-    if len(data_to_plot.sensor_number.unique()) != 1:
+    # if len(data_to_plot.sensor_number.unique()) != 1:
         # aggregated = 1
-        if room_number:
-            print('Plotting aggregated data for room_number {}: {}.'\
-                  .format(room_number, smart_building.room_info['name'].loc[room_number]))
+        # if room_number:
+            # print('Plotting aggregated data for room_number {}: {}.'\
+                  # .format(room_number, smart_building.room_info['name'].loc[room_number]))
             # print('Error: "plot_from_dataframe" function can only take one sensor at a time.')
-    else:
-        aggregated = 0
-        sensor_number = data_to_plot.sensor_number.unique()[0]
+    # else:
+        # aggregated = 0
+        # sensor_number = data_to_plot.sensor_number.unique()[0]
     
     # get parameters from columns headings 
     column_headings = list(data_to_plot.columns)
     
-    # the labels to look for in the dataframe.
+    # all paramters to look for in the dataframe.
     all_param_labels = ['occupancy', 'voc', 'co2', 'temperature', \
                    'pressure', 'humidity', 'lux', 'noise']
 
-    # the labels to plot on the graph
+    # all labels     
     all_plot_labels = ['Occupancy\n(n)', 'VOC\n(ppm?)', 'CO2\n(ppm?)',
                   'Temperature\n(°C)', 'Pressure\n(mBar)',
                   'Humidity\n(RH)', 'Light Intensity\n(lux)',
                   'Noise Levels\n(dB)']
 
-    # if parameters == None:
-    #     paramlabels = all_param_labels
-    #     plotlabels = all_plot_labels
-    # else:
+    # list for the ones to plot on the graph    
     paramlabels = []
     plotlabels= []
     
+    # find which parameters are included in dataframe and make lists
     for parameter in column_headings:
         if parameter in all_param_labels:
             paramlabels.append(all_param_labels[all_param_labels.index(parameter)])
             plotlabels.append(all_plot_labels[all_param_labels.index(parameter)])
 
-    
 
-    # Convert dates to datetime format
+    # Convert times to datetime format
     data_to_plot['timestamputc'] =\
         pd.to_datetime(data_to_plot['timestamputc'])
     # set as index
     data_to_plot = data_to_plot.set_index('timestamputc')
-    
-    
-    
-    if aggregated == 0:
+
+
+    # get sensor_numbers and sensor names from dataframe    
+    sensor_numbers = data_to_plot['sensor_number'].unique().tolist()
+    ##TODO: list(set()) does not preserve order. Use below function instead
+    sensor_names = data_to_plot['sensor_name'].unique().tolist()
+
+    # make plot title
+    if aggregate == 0:
         axtitle = str('Sensor readings')
             # str('Sensor readings from sensor number {}: {}.'
                       # .format(sensor_number,
                           # smart_building.sensor_location_info['name'].loc[sensor_number]))
-    else:
-        axtitle = str('Aggregated sensor readings for room {}: {}.' 
-                      .format(room_number, 
-                          smart_building.room_info['name'].loc[room_number]))
+        legend_series = sensor_names
+    elif aggregate == 1:
+        
+        ##TODO: this is used in plot_from_database so could be made into a function
+        # Would also be better if room name and number were contained in data_to_plot:
+        # need to change dataframe for this
+
+        # find which rooms sensors are in from 'Database' class
+        honestlywhythefuckwontitstopatbreakpoints = 1
+        room_names = data_to_plot['room_name'].unique().tolist()
+        ##TODO: may need this when not plotting overlay =1 aggregate = 1        
+            # database.sensor_location_info['room_name']\
+                              # .loc[sensor_numbers]
+        room_numbers = list(database.room_info.loc[ \
+                        database.room_info['room_name'].isin(room_names)].index)
+
+        
+        axtitle = str('Aggregated sensor readings')
+        legend_series = []
+        # sensor_names_str = []
+        for room_number, room_name in zip(room_numbers, room_names):       
+            # sensor_names_str = str(', '.join(sensor_names))
+            legend_str = str('Room number {}: {}' .format(room_number, room_name))
+            legend_series.append(legend_str)
+        # legend_series = room_names
+
+        # str('Aggregated sensor readings for room {}: {}.' 
+                      # .format(room_number, 
+                          # smart_building.room_info['name'].loc[room_number]))
 
 
     #%% THIS WORKS AND ARE PROBABLY FOR BEST ONES
-    sensor_numbers = list(set(data_to_plot['sensor_number']))
-    sensor_names = list(smart_building.sensor_location_info['name'])
+
     fontsizeL = 18
     fontszieS = 16
     
@@ -225,14 +263,21 @@ def plot_from_dataframe(data_to_plot=None, room_number=None, overlay=0, aggregat
         
     for j in range(0,len(paramlabels)):
         for i, sensor_number in enumerate(sensor_numbers, start=0):
-            axes[j].plot(data_to_plot[paramlabels[j]].loc[\
-                            data_to_plot['sensor_number']==sensor_number],\
+            
+            current_data = data_to_plot[paramlabels[j]].loc[\
+                            data_to_plot['sensor_number']==sensor_number]
+                
+                
+            axes[j].plot(current_data, label = legend_series[i],
                                                 marker='.', alpha=0.5,
                                                 linewidth=1.5,
                                                 markersize=6)
             axes[j].set_ylabel(plotlabels[j], rotation='horizontal',
                        ha='right', va='baseline', fontsize=fontsizeL, wrap=True)
+            
+            
 
+    handles, labels = axes[-1].get_legend_handles_labels()
 
     # axes = [plt.gca()]
     pos1 = axes[0].get_position() # get the original position 
@@ -247,7 +292,7 @@ def plot_from_dataframe(data_to_plot=None, room_number=None, overlay=0, aggregat
     # box = axes[0].get_position()
     # axes.set_position([box.x0, box.y0, box.width * 0.8, box.height])
 
-    leg = axes[0].legend(sensor_names, frameon=False, fontsize=fontsizeL, markerscale = 3,\
+    leg = axes[0].legend(handles, labels, frameon=False, fontsize=fontsizeL, markerscale = 3,\
                      bbox_to_anchor=(1, 1))
         # , loc='upper left')
         
@@ -265,180 +310,85 @@ def plot_from_dataframe(data_to_plot=None, room_number=None, overlay=0, aggregat
     axes[-1].xaxis.set_major_locator(locator)
     axes[-1].xaxis.set_major_formatter(formatter)
 
-    # fig.savefig('../Plots/aaa.png', aspect='auto', dpi=fig.dpi)
-    fig.savefig('../Plots/aaa.png', dpi=500)
+
+    figtime = str(data_to_plot.index.min().floor('Min').replace(tzinfo=None))
+    if aggregate == 1:
+        numstr = str('_'.join(str(x) for x in room_numbers))
+        fig_name = str(figtime+'_rooms_'+numstr+'_AG')
+    else:
+        numstr = str('_'.join(str(x) for x in sensor_numbers))
+        fig_name = str(figtime+'_sensors_'+numstr)
+    
+    if len(sensor_numbers) > 1:
+        fig_name = str(fig_name + '_OL')
+
+    fig_name = fig_name.replace(" ", "_")
+    fig_name = fig_name.replace(":", "-")
+
+    full_fig_name =  str('../Plots/{}.png'.format(fig_name))
+    # full_fig_name =  'short'
+   
+    
+    fig.savefig('../Plots/aaaa.png', dpi=500)
+
+    fig.savefig(full_fig_name, dpi=500)
 
     plt.show()
 
 
-# def get_lists_from_number(numbers, dataframe):    
-#     ''' Returns lists of values from coloumn_name in dataframe corresponding to certain index numbers.'''
-#     value_strings = list(dataframe[column_name].index.isin(numbers))
-#     return(numbers, value_strings)
-
-
 def aggregate_data(data_to_aggregate):
 
-    data_copy = data_to_aggregate.copy()
-    # round times in data_to_pot to nearest minute
-    data_to_aggregate['timestamputc'] = pd.to_datetime(data_to_aggregate['timestampms'], unit='ms')    
-    data_to_aggregate['timestamputc'] = data_to_aggregate['timestamputc'].dt.floor('Min')
-    # data_to_aggregate['timestamputc'] = data_to_aggregate['timestamputc'].dt.floor('ms')
-    
-    # data_to_aggregate['timestamputc'] = data_to_aggregate['timestamputc'].astype(str).apply(parse)
-    
-    data_to_aggregate['timestampms'] = data_to_aggregate[['timestamputc']].apply( \
-         lambda x: x[0].timestamp(), axis=1).astype('int64')*1000
+    # get sensor_numbers and sensor names from dataframe    
+    sensor_numbers = list(set(data_to_aggregate['sensor_number']))
+    sensor_names = list(set(data_to_aggregate['sensor_name']))    
+    sensor_names_str = str(', '.join(sensor_names))
+    sensor_numbers_str = str(', '.join(str(x) for x in sensor_numbers))
 
+    ##TODO: this is used in plot_from_database so could be made into a function
+    # Would also be better if room name and number were contained in data_to_plot:
+    # need to change dataframe for this
 
-    # PERFORM THE AGGREGATION
+    # find which rooms are sensors are in from 'Database' class
+    room_name = list(set(database.sensor_location_info['room_name']\
+                          .loc[sensor_numbers]))[0]
+    room_number = list(set(database.room_info.loc[ \
+             database.room_info['room_name']==room_name].index))[0]
+
+    # round times in data_to_aggregate to the nearest minute
+    data_to_aggregate['timestamputc'] = \
+        pd.to_datetime(data_to_aggregate['timestampms'], unit='ms')    
+    data_to_aggregate['timestamputc'] = \
+        data_to_aggregate['timestamputc'].dt.floor('Min')        
+    data_to_aggregate['timestampms'] = \
+        data_to_aggregate[['timestamputc']].apply( \
+        lambda x: x[0].timestamp(), axis=1).astype('int64')*1000
+
+    # Aggregate to get mean reading per sensor per minute
+    ##TODO:  remove ['occupancy'] to get mean per minute per sensor for each parameter
     aggregated_data = data_to_aggregate.groupby( \
-             ['timestampms', 'sensor_number'], as_index=False)['occupancy'].mean()
-    
+             ['timestampms', 'sensor_number'], as_index=False)['occupancy'].mean()     
+    # Get sum of occupcany
     aggregated_data = aggregated_data.groupby(['timestampms']).sum()
-        
     
-    
-    
-    # ['timestampms', 'sensor_number'])
-    # aggregated_data = data_to_aggregate.groupby(['timestampms']).sum()
-
+    # set the index to timestamp
     aggregated_data['timestampms'] = aggregated_data.index
-    # 1 NANOSECOND ADDDED TO THE TIME TO PRESERVE TIME FORMAT. ESSENTIAL TO RUN.
+    
+    # ADD 1 NANOSECOND TO PRESERVE TIME FORMAT. ESSENTIAL TO RUN.
     aggregated_data['timestamputc'] = aggregated_data['timestampms'] \
         .apply(lambda t: dt.datetime.utcfromtimestamp(int(t/1000)).isoformat()+'.000001+00:00')
     # aggregated_data['timestamputc'] = aggregated_data['timestamputc'].apply(parse)
-
     
-    ### THESE WERE PRETTY GOOD
-    # aggregated_data['timestamputc'] = pd.to_datetime(aggregated_data.index, unit='ms', infer_datetime_format=True)
-    # aggregated_data['timestamputc'] = pd.DatetimeIndex(aggregated_data['timestamputc'], tz='utc')
-    # aggregated_data['timestamputc'] = aggregated_data['timestamputc'].astype(str).apply(parse)
-    ### THESE WERE PRETTY GOOD
-
-
-
-    whats = 1
-    # aggregated_data['timestamputc'] =\
-    #     aggregated_data.index.dt.datetime.utcfromtimestamp().isoformat()
+    fuckingstopheretooplase = 1
     
-    # Series(s.values,index=pd.to_datetime(s,unit='s'))
-    # pd.DatetimeIndex(aggregated_data['timestamputc'], tz='utc')
-    
+    aggregated_data['room_name'] = room_name
+    aggregated_data['room_number'] = room_number
+    aggregated_data['sensor_name'] = sensor_names_str
+    aggregated_data['sensor_number'] = sensor_numbers_str
+
+
+    stop = 1
     
     return(aggregated_data)
-            
-    
-            
-    
-    
-    
-        # data_to_aggregate['new'] = pd.Timestamp(data_to_aggregate['timestamputc'])
-        
-        # int(data_to_aggregate['timestamputc'][0].timestamp())*1000
-
-
-        
-        # data_to_aggregate['timestamputc'] = data_to_aggregate['timestamputc'].To_timestamp() * 1000
-        
-        # # .dt.timestamp()
-        # datetime.values.astype(np.int64) // 10 ** 9
-
-        # data_to_aggregate['timestampms'] = pd.DataFrame.to_timestamp(data_to_aggregate['timestamputc'])
-        # data_to_aggregate['timestamputc'].datetime.astype('int64')
-        
-            
-            # groupby(['Team', 'Position']) 
-                # sensor_reading_latest['timestampms'] = sensor_reading_latest[['timestamputc']].apply(lambda x: x[0].timestamp(), axis=1).astype('int64')*1000
-
-        
-                # input_time = dt.datetime.utcfromtimestamp(int(timestamp_epoch_millisec/1000)).isoformat()
-
-        
-        
-        
-#         apply(replace(second=0, microsecond=0))
-        
-        
-#         data_to_plot['timestampms'].replace(second=0, microsecond=0)
-
-        
-#         test_time = 1584920729069
-#         test_time_utc= pd.to_datetime(test_time , unit='ms')        
-#         newdatetime = test_time_utc.replace(second=0, microsecond=0)
-        
-        
-#         data_to_plot['timestampms']
-#         data_to_plot['timestamputc'] = pd.to_datetime(aggregated_data['timestampms'], unit='ms')
-
-        
-        
-        
-#         aggregated_data['timestampms'] = aggregated_data.index
-#         aggregated_data['timestamputc'] = pd.to_datetime(aggregated_data['timestampms'], unit='ms')
-
-        
-        
-#         aggregated_data = data_to_plot.groupby('timestampms').sum()
-        
-        
-#         aggregated_data['timestampms'].timestamp.dt.round('1m')
-        
-#         datetime.datetime.strptime(when, '%Y-%m-%d').date()
-
-#         test_time = 1584920729069
-#         test_time_utc= pd.to_datetime(test_time , unit='ms')        
-#         newdatetime = test_time_utc.replace(second=0, microsecond=0)
-
-        
-#         datetime.datetime.strptime(test_time_utc, '%Y-%m-%d').date()
-        
-        
-#         data_to_plot['timestamputc'] = pd.to_datetime(aggregated_data['timestampms'], unit='ms')
-
-        
-        
-#         .timestamp.dt.round('1m')
-        
-        
-#         aggregated_data['timestampms'] = aggregated_data.index
-#         aggregated_data['timestamputc'] = pd.to_datetime(aggregated_data['timestampms'], unit='ms')
-
-            
-#             aggregated_data['timestampms'].apply(parse)
-#             dt.datetime.utcfromtimestamp(int(aggregated_data['timestampms']/1000)).isoformat()
-
-# aggregated_data[['timestampms']].apply(
-    
-#     dt.datetime.utcfromtimestamp(aggregated_data['timestampms'].astype(int)).isoformat()
-    
-#     .astype('int64')/1000
-    
-#     lambda x: x[0].utcfromtimestamp(), axis=1).astype('int64')/1000
-
- 
-# sensor_reading_latest['timestamputc'] = sensor_reading_latest['timestamputc'].apply(parse)
-# sensor_reading_latest['timestampms'] = sensor_reading_latest[['timestamputc']].apply(lambda x: x[0].timestamp(), axis=1).astype('int64')*1000
-
-#     dt.datetime.utcfromtimestamp((aggregated_data['timestampms']/1000).astype(int)).isoformat()
-
-
- 
-#         sensor_reading_latest['timestamputc'] = sensor_reading_latest['timestamputc'].apply(parse)
-#         sensor_reading_latest['timestampms'] = 
-        
-        
-# sensor_reading_latest[['timestamputc']].apply(lambda x: x[0].timestamp(), axis=1).astype('int64')*1000
-
-
-
-# (aggregated_data['timestampms']/1000).astype(int)
-
-
-# df['datetime'] = pd.to_datetime(df['date'])
-
-
-# int(aggregated_data.index/1000)
 
 
 def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920305102,\
@@ -506,6 +456,7 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
 
         elif aggregate == 0:
             # choose from the sensors in those rooms
+            ##TODO: this may already exist in code above
             sensors_in_chosen_rooms = smart_building.sensor_location_info.loc[ \
                               smart_building.sensor_location_info['roomname'].isin(room_names)]
             sensor_numbers, sensor_names = scrp.choose_by_number(sensors_in_chosen_rooms)
@@ -518,7 +469,32 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
         # the labels to look for in the dataframe.
         parameters = ['occupancy', 'voc', 'co2', 'temperature', \
                        'pressure', 'humidity', 'lux', 'noise']
-    if aggregate ==1:
+
+
+    #%% AGGREGATE = 0 OVERLAY = 0
+    if aggregate == 0 and overlay == 0:
+        for sensor_number in sensor_numbers:
+                try:
+                    # retrieve the data
+                    data_to_plot = retrieve_data(sensor_number, time_from, time_to, parameters)        
+                    if not data_to_plot.empty:
+                        print('Plotting data from sensor {}: {}.'\
+                              .format(sensor_number, \
+                              database.sensor_location_info['sensor_name'].\
+                              loc[sensor_number]))
+                        plot_from_dataframe(data_to_plot)
+                    else:
+                        # print('No data for sensor {}: {}.'\
+                          # .format(sensor_number, \
+                          # database.sensor_location_info['sensor_name'].\
+                              # loc[sensor_number]))
+                        continue
+                except Exception as e:
+                    print("Error with sensor number {}: {}.".format(sensor_number, e))
+        return()
+                    
+    #%% AGGREGATE = 1 OVERLAY = 0                    
+    elif aggregate ==1 and overlay ==0:
 
         parameters = 'occupancy'
 
@@ -527,16 +503,12 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
 
         sensors_in_chosen_rooms = smart_building.sensor_location_info.loc[ \
           smart_building.sensor_location_info['roomname'].isin(room_names)]
-            
-        # THIS IS TEMPORARY
-        all_sensor_numbers, all_sensor_names = scrp.get_values_and_indexes(sensors_in_chosen_rooms)
         
-        overlay = 1
         for room_number, room_name in zip(room_numbers, room_names):
             
-            if room_number == room_numbers[-1]:
-                overlay = 2
-            print('Overlay: {}'.format(overlay))            
+            # if room_number == room_numbers[-1]:
+                # overlay = 2
+            # print('Overlay: {}'.format(overlay))            
             print('Aggregating occupancy data for room {}: {}...'.format(room_number, room_name))
 
             sensors_in_chosen_rooms = smart_building.sensor_location_info.loc[ \
@@ -547,33 +519,85 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
             try:
                 data_to_plot = retrieve_data(sensor_numbers, time_from, time_to, parameters)
                 aggregated_data = aggregate_data(data_to_plot)        
-                plot_from_dataframe(aggregated_data, int(room_number), overlay)
+                plot_from_dataframe(aggregated_data, aggregate=1)
             except Exception as e:
                 print("Error aggregating data for room number {}: {}.".format(room_number, e) )   
-           
-            overlay = 0
-            
+
+            # overlay = 0
+
         return()
 
-    if overlay==1:
+    #%% AGGREGATE = 0 OVERLAY = 1                    
+    elif aggregate == 0 and overlay ==1:
          data_to_plot = retrieve_data(sensor_numbers, time_from, time_to, parameters=parameters)
          sorted_data = data_to_plot.sort_values(by=['sensor_number', 'timestampms'])
          plot_from_dataframe(sorted_data)
+         return()
 
+    #%% AGGREGATE = 1 OVERLAY = 1                      
+    elif aggregate == 1 and overlay==1:
 
+        ##TODO: aggregate currently only runs with occupancy
+        parameters = 'occupancy'
 
+        if isinstance(room_numbers, int):
+            room_numbers = [room_numbers]
 
-    for sensor_number in all_sensor_numbers:
-            try:
-                if aggregate == 1:
-                    data_to_plot = retrieve_data(sensor_number, time_from, time_to, parameters='occupancy')
-                else:
-                    # retrieve the data
-                    data_to_plot = retrieve_data(sensor_number, time_from, time_to, parameters)
+        sensors_in_chosen_rooms = smart_building.sensor_location_info.loc[ \
+          smart_building.sensor_location_info['roomname'].isin(room_names)]
+        
+        
+        for room_number, room_name in zip(room_numbers, room_names):
+            
+            # if room_number == room_numbers[-1]:
+                # overlay = 2
+            # print('Overlay: {}'.format(overlay))            
+            print('Aggregating occupancy data for room {}: {}...'.format(room_number, room_name))
+
+            sensors_in_chosen_rooms = smart_building.sensor_location_info.loc[ \
+                  smart_building.sensor_location_info['roomname'].isin([room_name])]
     
-                plot_from_dataframe(data_to_plot)
-            except Exception as e:
-                print("Error with sensor number {}: {}.".format(sensor_number, e) )   
+            sensor_numbers, sensor_names = scrp.get_values_and_indexes(sensors_in_chosen_rooms)
+            
+            
+            data_to_plot = retrieve_data(sensor_numbers, time_from, time_to, parameters)
+            if data_to_plot.empty:
+                print('No data or something for room {}: {}...'.format(room_number, room_name))
+
+                continue
+            else:
+                
+                aggregated_data = aggregate_data(data_to_plot)
+                # aggregated_data = aggregated_data.rename_axis(None)
+
+                # https://towardsdatascience.com/why-and-how-to-use-merge-with-pandas-in-python-548600f7e738
+                ##TODO: THIS METHOD OF MERGING MAY REPEAT VALUES AND MAY NOT WORK IF NOT AGGREGATED_DATA FOR FIRST ROOM
+                if room_number == room_numbers[0]:
+                    aggregated_dfs = aggregated_data
+                else:    
+                    # aggregated_data = aggregated_data.rename_axis(None)
+                    # aggregated_data.index = aggregated_data.reindex(index=range(0,len(aggregated_data)))
+                    aggregated_dfs = pd.concat([aggregated_dfs, aggregated_data], axis=0)
+                    # pd.merge(aggregated_dfs, aggregated_data, how='right')
+
+
+        whythefuckwhontyoufuckingstop =1 
+                            
+
+        fuckingstopherenow = 1
+        try:
+            aggregated_dfs = aggregated_dfs.rename_axis(None)
+            sorted_data = aggregated_dfs.sort_values(by=['room_number', 'timestampms'])
+            plot_from_dataframe(sorted_data, aggregate=1)
+        except Exception as e:
+            print("Error aggregating data for room number {}: {}.".format(room_number, e) )   
+
+            # overlay = 0
+
+        return()
+       
+        
+       
 
 
 #%% Program starts here
@@ -590,23 +614,19 @@ c = conn.cursor()
 # Create class instance to get info so scraper does not have to be called
 database = Database()
 
-# plot_from_database(sensor_numbers=6, time_from=1583020800000, \
-                   # time_to = 1583107200000, parameters='occupancy')
+# Try plotting 24 hours with different combinations of overlay and aggregate
+plot_from_database(room_numbers=[1,2,3], overlay=1, aggregate=1, time_from=1583280000000, \
+                    time_to = 1583366400000)
 
-# plot_from_database(parameters='occupancy')
+plot_from_database(room_numbers=[1,2,3], overlay=1, aggregate=0, time_from=1583280000000, \
+                    time_to = 1583366400000)
 
+plot_from_database(room_numbers=[1,2,3], overlay=0, aggregate=1, time_from=1583280000000, \
+                    time_to = 1583366400000)
     
-plot_from_database(overlay=1, time_from=1583280000000, \
-                   time_to = 1583366400000, parameters=['occupancy', 'noise'])
-
-# plot_from_database()
-
-# data = retrieve_data(5, ['occupancy','voc','co2'])
-
-# plot_from_dataframe(data)
-
-
-
+plot_from_database(room_numbers=[1,2,3], overlay=0, aggregate=0, time_from=1583280000000, \
+                    time_to = 1583366400000)
+    
 # # this is the time of the earliest sensor reading in the database
 # earliest_time = 1580920300000
 
