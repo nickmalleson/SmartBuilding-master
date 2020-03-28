@@ -183,11 +183,17 @@ def plot_from_dataframe(data_to_plot=None, aggregate=0):
     all_param_labels = ['occupancy', 'voc', 'co2', 'temperature', \
                    'pressure', 'humidity', 'lux', 'noise']
 
-    # all labels     
-    all_plot_labels = ['Occupancy\n(n)', 'VOC\n(ppm?)', 'CO2\n(ppm?)',
+    # all labels
+    if aggregate == 0:     
+        all_plot_labels = ['Occupancy\n(n)', 'VOC\n(ppm)', 'CO2\n(ppm)',
                   'Temperature\n(°C)', 'Pressure\n(mBar)',
                   'Humidity\n(RH)', 'Light Intensity\n(lux)',
                   'Noise Levels\n(dB)']
+    else:
+        all_plot_labels = ['Occupancy\n(n, sum)', 'VOC\n(ppm, mean)', 'CO2\n(ppm, mean)',
+                  'Temperature\n(°C, mean)', 'Pressure\n(mBar, mean)',
+                  'Humidity\n(RH, mean)', 'Light Intensity\n(lux, mean)',
+                  'Noise Levels\n(dB, mean)']
 
     # list for the ones to plot on the graph    
     paramlabels = []
@@ -333,11 +339,11 @@ def plot_from_dataframe(data_to_plot=None, aggregate=0):
     plt.show()
 
 
-def aggregate_data(data_to_aggregate):
+def aggregate_data(data_to_aggregate, parameters):
 
     # get sensor_numbers and sensor names from dataframe    
-    sensor_numbers = list(set(data_to_aggregate['sensor_number']))
-    sensor_names = list(set(data_to_aggregate['sensor_name']))    
+    sensor_numbers = data_to_aggregate['sensor_number'].unique().tolist()
+    sensor_names = data_to_aggregate['sensor_name'].unique().tolist()
     sensor_names_str = str(', '.join(sensor_names))
     sensor_numbers_str = str(', '.join(str(x) for x in sensor_numbers))
 
@@ -346,10 +352,13 @@ def aggregate_data(data_to_aggregate):
     # need to change dataframe for this
 
     # find which rooms are sensors are in from 'Database' class
-    room_name = list(set(database.sensor_location_info['room_name']\
-                          .loc[sensor_numbers]))[0]
-    room_number = list(set(database.room_info.loc[ \
-             database.room_info['room_name']==room_name].index))[0]
+    # NOTE: aggregate_data() can only take 1 room at a time
+    room_name = database.sensor_location_info['room_name']\
+                          .loc[sensor_numbers].unique().tolist()[0]
+
+    room_number = \
+    database.room_info[database.room_info['room_name'] == room_name].index[0]
+
 
     # round times in data_to_aggregate to the nearest minute
     data_to_aggregate['timestamputc'] = \
@@ -361,12 +370,19 @@ def aggregate_data(data_to_aggregate):
         lambda x: x[0].timestamp(), axis=1).astype('int64')*1000
 
     # Aggregate to get mean reading per sensor per minute
-    ##TODO:  remove ['occupancy'] to get mean per minute per sensor for each parameter
-    aggregated_data = data_to_aggregate.groupby( \
-             ['timestampms', 'sensor_number'], as_index=False)['occupancy'].mean()     
+    mean_per_minute_per_sensor = data_to_aggregate.groupby( \
+             ['timestampms', 'sensor_number'], as_index=False)[parameters].mean()
+
+    # generate mean of mean 
+    mean_per_minute_total = mean_per_minute_per_sensor.groupby(['timestampms']).mean()
+
     # Get sum of occupcany
-    aggregated_data = aggregated_data.groupby(['timestampms']).sum()
-    
+    occupancy_sum = mean_per_minute_per_sensor.groupby(['timestampms']).sum()
+
+    # get data for output and replace mean occupancy with sum
+    aggregated_data = mean_per_minute_total
+    aggregated_data['occupancy'] = occupancy_sum['occupancy']
+
     # set the index to timestamp
     aggregated_data['timestampms'] = aggregated_data.index
     
@@ -379,7 +395,9 @@ def aggregate_data(data_to_aggregate):
     aggregated_data['room_number'] = room_number
     aggregated_data['sensor_name'] = sensor_names_str
     aggregated_data['sensor_number'] = sensor_numbers_str
+ 
     
+    check_here=1
     return(aggregated_data)
 
 
@@ -388,7 +406,9 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
 
     # choose rooms to plot from
     if(room_numbers == None and sensor_numbers == None):
+        ##TODO: replace smart_building with database. E
         room_numbers, room_names = scrp.choose_by_number(smart_building.room_info)
+        room_numbers, room_names = scrp.choose_by_number(database.room_info)
 
         if aggregate == 0:
             # choose from the sensors in those rooms
@@ -457,7 +477,7 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
     if time == None:
         time_from, time_to = choose_time()
 
-    if parameters == None and aggregate == 0:
+    if parameters == None:
         # the labels to look for in the dataframe.
         parameters = ['occupancy', 'voc', 'co2', 'temperature', \
                        'pressure', 'humidity', 'lux', 'noise']
@@ -530,7 +550,7 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
     elif aggregate == 1 and overlay==1:
 
         ##TODO: aggregate currently only runs with occupancy
-        parameters = 'occupancy'
+        # parameters = 'occupancy'
 
         if isinstance(room_numbers, int):
             room_numbers = [room_numbers]
@@ -559,7 +579,7 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
                 continue
             else:
                 
-                aggregated_data = aggregate_data(data_to_plot)
+                aggregated_data = aggregate_data(data_to_plot,parameters)
                 # aggregated_data = aggregated_data.rename_axis(None)
 
                 # https://towardsdatascience.com/why-and-how-to-use-merge-with-pandas-in-python-548600f7e738
