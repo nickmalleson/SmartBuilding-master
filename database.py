@@ -27,31 +27,28 @@ class Database():
 
     def __init__(self):
             
-        self.conn, self.c = Database._connect_to_database(self)        
+        self.conn, self.c = Database._connect_to_database()        
         self.existing_readings = Database._retrieve_existing_readings(self)
         self.smart_building = scrp.Scraper()
 
 
     @staticmethod
-    def _connect_to_database(self):
+    def _connect_to_database():
         ##TODO: DODGY USE OF GLOBAL VARIABLES WHILST TESTING. NEEDS SORTING OUT
         # Connect to the database (creates a Connection object)
         # global conn, c
     
-        try:
-            # global conn, c
+        # global conn, c
+
+        # connect to database
+        conn = sqlite3.connect("./database.db")
     
-            # connect to database
-            conn = sqlite3.connect("../database/database.db")
-        
-            # Create a cursor to operate on the database
-            c = conn.cursor()
-        except Exception as e:
-                print('Error: ', e)
+        # Create a cursor to operate on the database
+        c = conn.cursor()
         return(conn, c)
+      
  
     
-    @staticmethod
     def _retrieve_existing_readings(self):
         '''Obtains details of existing database entries to check against.
         Returns a dataframe containing a list of existing time readings and

@@ -40,7 +40,7 @@ def get_login_info():
     ''' Get login username and password from locally stored parameter file.'''
 
     # Look in the folder in the directory above the present working directory
-    parameter_file_path = '../SmartBuildingParameters/'
+    parameter_file_path = './SmartBuildingParameters/'
     parameter_file_name = 'SmartBuildingParameters.txt'
     parameter_file = open(parameter_file_path + parameter_file_name)
     params = {}
@@ -196,10 +196,11 @@ class Scraper():
             print('Login successful.\nBuilding info aquired successfully '\
                   'from {} building(s). First building: {}.' 
                   .format(len(building_info), building_info['name'].loc[1]))
-
-        else:
-            print('Page not found or no building associated with account.')
-        return(username, password, building_info)
+            return(username, password, building_info)
+        
+        # If here then we weren't able to log on.
+        raise Exception('Problem logging in. The respone code is {} (200 is success)'.format(responsecheck))
+        
 
     def _call_API(self, function_name):
         """Call the API, inserting 'function_name' into the URL. E.g.:
