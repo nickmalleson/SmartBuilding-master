@@ -23,8 +23,6 @@ register_matplotlib_converters()
 # warnings.warn(msg, FutureWarning)
 
 
-
-
 class Database():
     '''Obtains login details and stores data associated with the account in co-
     stant variables.
@@ -175,6 +173,8 @@ def plot_from_dataframe(data_to_plot=None, aggregate=0):
     # else:
         # aggregated = 0
         # sensor_number = data_to_plot.sensor_number.unique()[0]
+
+    ##TODO: first thing to do should be to sory daya by sensor_number/room_number to make sure legends are accurate
     
     # get parameters from columns headings 
     column_headings = list(data_to_plot.columns)
@@ -245,7 +245,7 @@ def plot_from_dataframe(data_to_plot=None, aggregate=0):
         # sensor_names_str = []
         for room_number, room_name in zip(room_numbers, room_names):       
             # sensor_names_str = str(', '.join(sensor_names))
-            legend_str = str('Room number {}: {}' .format(room_number, room_name))
+            legend_str = str('Room number {}:\n        {}' .format(room_number, room_name))
             legend_series.append(legend_str)
         # legend_series = room_names
 
@@ -259,7 +259,7 @@ def plot_from_dataframe(data_to_plot=None, aggregate=0):
     fontsizeL = 18
     fontszieS = 16
     
-    fig, axes = plt.subplots(len(paramlabels),  figsize=(15, 15), sharex=True)
+    fig, axes = plt.subplots(len(paramlabels),  figsize=(20, 15), sharex=True)
 
     if len(paramlabels)== 1:
         axes = [axes]
@@ -294,14 +294,17 @@ def plot_from_dataframe(data_to_plot=None, aggregate=0):
 
     # box = axes[0].get_position()
     # axes.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-
+    ##TODO: UserWarning: Creating legend with loc="best" can be slow with large amounts of data.
+    # fig.savefig(full_fig_name, dpi=500)   
     leg = axes[0].legend(handles, labels, frameon=False, fontsize=fontsizeL, markerscale = 3,\
                      bbox_to_anchor=(1, 1))
         # , loc='upper left')
         
                      # , borderaxespad=0., loc='upper left', bbox_to_anchor=(1, plt.y1), loc=2, borderaxespad=0.)
                     #was 9.5
-                    
+
+    fig.suptitle(axtitle, y=.95, fontsize=fontsizeL*2)
+
     for line in leg.get_lines():
         line.set_linewidth(3)
 
@@ -328,11 +331,11 @@ def plot_from_dataframe(data_to_plot=None, aggregate=0):
     fig_name = fig_name.replace(" ", "_")
     fig_name = fig_name.replace(":", "-")
 
-    full_fig_name =  str('../Plots/{}.png'.format(fig_name))
+    full_fig_name =  str('./Plots/{}.png'.format(fig_name))
     # full_fig_name =  'short'
    
     
-    fig.savefig('../Plots/aaaa.png', dpi=500)
+    # fig.savefig('../Plots/aaaa.png', dpi=500)
 
     fig.savefig(full_fig_name, dpi=500)
 
@@ -407,30 +410,30 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
     # choose rooms to plot from
     if(room_numbers == None and sensor_numbers == None):
         ##TODO: replace smart_building with database. E
-        room_numbers, room_names = scrp.choose_by_number(smart_building.room_info)
-        room_numbers, room_names = scrp.choose_by_number(database.room_info)
+        room_numbers, room_names = choose_by_number(smart_building.room_info)
+        room_numbers, room_names = choose_by_number(database.room_info)
 
         if aggregate == 0:
             # choose from the sensors in those rooms
             sensors_in_chosen_rooms = smart_building.sensor_location_info.loc[ \
                               smart_building.sensor_location_info['roomname'].isin(room_names)]
-            sensor_numbers, sensor_names = scrp.choose_by_number(sensors_in_chosen_rooms)
+            sensor_numbers, sensor_names = choose_by_number(sensors_in_chosen_rooms)
         elif aggregate == 1:
             # get the sensors in those rooms
             sensors_in_chosen_rooms = smart_building.sensor_location_info.loc[ \
                               smart_building.sensor_location_info['roomname'].isin(room_names)]
-            sensor_numbers, senor_names = scrp.get_values_and_indexes(sensors_in_chosen_rooms)
+            sensor_numbers, senor_names = get_values_and_indexes(sensors_in_chosen_rooms)
 
     elif(room_numbers == None and sensor_numbers and aggregate == 0):
         if isinstance(sensor_numbers, int):
             sensor_numbers = [sensor_numbers]
 
         # get corresponding sensor names
-        _, sensor_names = scrp.get_values_and_indexes( \
+        _, sensor_names = get_values_and_indexes( \
                                            smart_building.sensor_location_info.loc[sensor_numbers])
         
         # get the names of the rooms containing these sensors as a list with no duplicates
-        _, room_names = scrp.get_values_and_indexes( \
+        _, room_names = get_values_and_indexes( \
                            smart_building.sensor_location_info.loc[sensor_numbers], 'roomname')
 
         # remove duplicates
@@ -442,7 +445,7 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
                           smart_building.room_info['name'].isin(room_names)]
         
         # finally, get the corresponding room numbers
-        room_numbers, _ = scrp.get_values_and_indexes(rooms_containing_chosen_sensors)
+        room_numbers, _ = get_values_and_indexes(rooms_containing_chosen_sensors)
 
     elif(sensor_numbers == None and room_numbers):
       
@@ -456,7 +459,7 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
             # choose from the sensors in those rooms
             sensors_in_chosen_rooms = smart_building.sensor_location_info.loc[ \
                               smart_building.sensor_location_info['roomname'].isin(room_names)]
-            sensor_numbers, sensor_names = scrp.choose_by_number(sensors_in_chosen_rooms)
+            sensor_numbers, sensor_names = choose_by_number(sensors_in_chosen_rooms)
 
         # if isinstance(room_numbers, int):    
         #     room_names = smart_building.sensor_location_info['name'].loc[room_numbers]           
@@ -464,14 +467,14 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
         #     room_names = list(smart_building.sensor_location_info['name'].loc[room_numbers])
 
             
-            all_sensor_numbers, all_sensor_names = scrp.get_values_and_indexes(sensors_in_chosen_rooms)
+            all_sensor_numbers, all_sensor_names = get_values_and_indexes(sensors_in_chosen_rooms)
 
         elif aggregate == 0:
             # choose from the sensors in those rooms
             ##TODO: this may already exist in code above
             sensors_in_chosen_rooms = smart_building.sensor_location_info.loc[ \
                               smart_building.sensor_location_info['roomname'].isin(room_names)]
-            sensor_numbers, sensor_names = scrp.choose_by_number(sensors_in_chosen_rooms)
+            sensor_numbers, sensor_names = choose_by_number(sensors_in_chosen_rooms)
 
     #Choose the time range. E.g. 1st to 2nd March: [1583020800000, 1583107200000]
     if time == None:
@@ -526,7 +529,7 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
             sensors_in_chosen_rooms = smart_building.sensor_location_info.loc[ \
                   smart_building.sensor_location_info['roomname'].isin([room_name])]
     
-            sensor_numbers, sensor_names = scrp.get_values_and_indexes(sensors_in_chosen_rooms)
+            sensor_numbers, sensor_names = get_values_and_indexes(sensors_in_chosen_rooms)
 
             try:
                 data_to_plot = retrieve_data(sensor_numbers, time_from, time_to, parameters)
@@ -569,7 +572,7 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
             sensors_in_chosen_rooms = smart_building.sensor_location_info.loc[ \
                   smart_building.sensor_location_info['roomname'].isin([room_name])]
     
-            sensor_numbers, sensor_names = scrp.get_values_and_indexes(sensors_in_chosen_rooms)
+            sensor_numbers, sensor_names = get_values_and_indexes(sensors_in_chosen_rooms)
             
             
             data_to_plot = retrieve_data(sensor_numbers, time_from, time_to, parameters)
@@ -601,9 +604,76 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
             # overlay = 0
 
         return()
-       
+
+##TODO: Copy and pasted from scraper as it was made a static method and therefore no longer accesible
+def get_values_and_indexes(dataframe, column_name='name'):
+    ''' Returns lists of values from coloumn_name in dataframe and corresponding index numbers.'''
+
+    value_nums = list(dataframe.index)
+    value_strings = list(dataframe[column_name])
+    return (value_nums, value_strings)
         
-       
+   ##TODO: Copy and pasted from scraper as it was made a static method and therefore no longer accesible    
+def choose_by_number(dataframe):
+    ''' Takes user input to choose from a list using the index column name.
+
+    Parameters
+    ----------
+    dataframe: panda dataframe
+        The dataframe from the Scraper() object (e.g. scraper.room_info) from which to choose.
+
+    Returns
+    -------
+    chosen_numbers: list of ints
+        List of numbers corresponding to chosen names.
+    chosen_names: list of strings
+        List of names corresponding to chosen numbers.
+    '''
+    list_description = dataframe.index.name
+    list_of_numbers, list_of_names = get_values_and_indexes(dataframe)
+
+    if len(list_of_numbers) == 1:
+        chosen_numbers = list_of_numbers
+        chosen_names = list_of_names
+        print('Only one {} available, so number {}: \'{}\' was selected '
+              'by default.'.format(list_description,
+                                   chosen_numbers[0],
+                                   list_of_names[0]))
+        return (chosen_numbers, chosen_names)
+
+    print("\nAvailable:")
+    for number, name in zip(list_of_numbers, list_of_names):
+        print("{} {}: {}.".format(list_description, number, name))
+
+    chosen_numbers = input(
+        'Choose by number. Use the format:\n \'1\' for single, \'1, 2, 3\''
+        'for multiple, or press enter for all.\n Use \'range()\' to return a '
+        'list (e.g.\'range(3,6)\' returns \'3,4,5\'):\n>>')
+
+    if not chosen_numbers:
+        chosen_numbers = list_of_numbers
+        chosen_names = list_of_names
+    else:
+        chosen_names = []
+        chosen_numbers = eval(chosen_numbers)
+
+        if isinstance(chosen_numbers, int):
+            chosen_numbers = [chosen_numbers]
+        elif isinstance(chosen_numbers, range) or \
+                isinstance(chosen_numbers, tuple):
+            chosen_numbers = list(chosen_numbers)
+
+        for number in chosen_numbers:
+            if number not in list_of_numbers or number <= 0:
+                sys.exit('\nBad index number {}.'.format(number))
+            else:
+                chosen_names.append(list_of_names[list_of_numbers.index(number)])
+
+    print('\nChosen:')
+    for (number, name) in zip(chosen_numbers, chosen_names):
+        print('{} {}: {}.'.format(list_description, number, name))
+
+    return (chosen_numbers, chosen_names)
 
 
 #%% Program starts here
@@ -612,7 +682,7 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
 smart_building = scrp.Scraper()
 
 # Connect to the database (creates a Connection object)
-conn = sqlite3.connect("../database/database.db")
+conn = sqlite3.connect("./database.db")
 
 # Create a cursor to operate on the database
 c = conn.cursor()
@@ -620,21 +690,27 @@ c = conn.cursor()
 # Create class instance to get info so scraper does not have to be called
 database = Database()
 
+sensor_numbers = database.sensor_location_info.index.tolist()
+
+
 # Try plotting 24 hours with different combinations of overlay and aggregate
 plot_from_database(room_numbers=[1,2,3], overlay=1, aggregate=1, time_from=1583280000000, \
-                    time_to = 1583366400000)
+                    time_to = 1583366400000, parameters=['occupancy', 'noise'])
+    # , parameters='occupancy')
 
-plot_from_database(room_numbers=[1,2,3], overlay=1, aggregate=0, time_from=1583280000000, \
-                    time_to = 1583366400000)
+# plot_from_database(sensor_numbers=sensor_numbers, overlay=1, aggregate=0, time_from=1583280000000, \
+#                     time_to = 1583366400000)
 
-plot_from_database(room_numbers=[1,2,3], overlay=0, aggregate=1, time_from=1583280000000, \
-                    time_to = 1583366400000)
+# plot_from_database(room_numbers=[1, 2, 3], overlay=0, aggregate=1, time_from=1583280000000, \
+#                     time_to = 1583366400000)
     
-plot_from_database(room_numbers=[1,2,3], overlay=0, aggregate=0, time_from=1583280000000, \
-                    time_to = 1583366400000)
+# plot_from_database(sensor_numbers=sensor_numbers, overlay=0, aggregate=0, time_from=1583280000000, \
+#                     time_to = 1583366400000)
+
+# plot_from_database(room_numbers=[1, 2, 3], overlay=1, aggregate=1, parameters='occupancy')
     
-# # this is the time of the earliest sensor reading in the database
-# earliest_time = 1580920300000
+# this is the time of the earliest sensor reading in the database
+earliest_time = 1580920300000
 
 # plot_from_data
 # # run programbase()
