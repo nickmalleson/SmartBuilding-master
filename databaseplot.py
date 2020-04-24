@@ -16,8 +16,9 @@ import requests as r  # required to acesss API
 import sys
 import time
 import datetime as dt
+from scraper import Scraper
 
-
+# To convert time stamps for plotting x axes
 from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
 # warnings.warn(msg, FutureWarning)
@@ -42,22 +43,17 @@ class Database():
         return(dataframe)
 
 
-def time_now():
-    ''' Get the current time as ms time epoch'''
-    return(int(round(time.time() * 1000)))
-
-
 def choose_time():
     ''' Get user input to choose a time in ms time epoch. 
     Times are equivalent to those at https://currentmillis.com/ '''
     
-    ##TODO: why /1000??
     # get time before earliest sensor reading.
     earliest_time_ms = 1580920305102
+    # divide by 1000 because time is in ms and utcfromtimestamp takes input in s
     earliest_time_utc = dt.datetime.utcfromtimestamp(int(earliest_time_ms/1000)).isoformat()
 
     # get time now
-    time_now_ms = time_now()
+    time_now_ms = Scraper._time_now()
     time_now_utc = dt.datetime.utcfromtimestamp(int(time_now_ms/1000)).isoformat() 
 
     chosen_times = input('Choose start and end time to plot in ms epochs in format '\
@@ -110,7 +106,7 @@ def build_values_string(values):
         return(values_string)
 
 
-def retrieve_data(sensor_numbers, time_from=1580920305102, time_to=time_now(), parameters=None):
+def retrieve_data(sensor_numbers, time_from=1580920305102, time_to=Scraper._time_now(), parameters=None):
     ''' Retrieve data from the database based on sensor number and timeframe using pd.read_sql.
     https://stackoverflow.com/questions/24408557/pandas-read-sql-with-parameters/24418294 
     '''
@@ -174,7 +170,7 @@ def plot_from_dataframe(data_to_plot=None, aggregate=0):
         # aggregated = 0
         # sensor_number = data_to_plot.sensor_number.unique()[0]
 
-    ##TODO: first thing to do should be to sory daya by sensor_number/room_number to make sure legends are accurate
+    ##TODO: first thing to do should be to sort data by sensor_number/room_number to make sure legends are accurate
     
     # get parameters from columns headings 
     column_headings = list(data_to_plot.columns)
@@ -405,35 +401,35 @@ def aggregate_data(data_to_aggregate, parameters):
 
 
 def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920305102,\
-                       time_to=time_now(), parameters=None, overlay=0, aggregate=0):
+                       time_to=Scraper._time_now(), parameters=None, overlay=0, aggregate=0):
 
     # choose rooms to plot from
     if(room_numbers == None and sensor_numbers == None):
         ##TODO: replace smart_building with database. E
-        room_numbers, room_names = choose_by_number(smart_building.room_info)
-        room_numbers, room_names = choose_by_number(database.room_info)
+        room_numbers, room_names = Scraper._choose_by_number(smart_building.room_info)
+        room_numbers, room_names = Scraper._choose_by_number(database.room_info)
 
         if aggregate == 0:
             # choose from the sensors in those rooms
             sensors_in_chosen_rooms = smart_building.sensor_location_info.loc[ \
                               smart_building.sensor_location_info['roomname'].isin(room_names)]
-            sensor_numbers, sensor_names = choose_by_number(sensors_in_chosen_rooms)
+            sensor_numbers, sensor_names = Scraper._choose_by_number(sensors_in_chosen_rooms)
         elif aggregate == 1:
             # get the sensors in those rooms
             sensors_in_chosen_rooms = smart_building.sensor_location_info.loc[ \
                               smart_building.sensor_location_info['roomname'].isin(room_names)]
-            sensor_numbers, senor_names = get_values_and_indexes(sensors_in_chosen_rooms)
+            sensor_numbers, senor_names = Scraper._get_values_and_indexes(sensors_in_chosen_rooms)
 
     elif(room_numbers == None and sensor_numbers and aggregate == 0):
         if isinstance(sensor_numbers, int):
             sensor_numbers = [sensor_numbers]
 
         # get corresponding sensor names
-        _, sensor_names = get_values_and_indexes( \
+        _, sensor_names = Scraper._get_values_and_indexes( \
                                            smart_building.sensor_location_info.loc[sensor_numbers])
         
         # get the names of the rooms containing these sensors as a list with no duplicates
-        _, room_names = get_values_and_indexes( \
+        _, room_names = Scraper._get_values_and_indexes( \
                            smart_building.sensor_location_info.loc[sensor_numbers], 'roomname')
 
         # remove duplicates
@@ -445,7 +441,7 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
                           smart_building.room_info['name'].isin(room_names)]
         
         # finally, get the corresponding room numbers
-        room_numbers, _ = get_values_and_indexes(rooms_containing_chosen_sensors)
+        room_numbers, _ = Scraper._get_values_and_indexes(rooms_containing_chosen_sensors)
 
     elif(sensor_numbers == None and room_numbers):
       
@@ -459,7 +455,7 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
             # choose from the sensors in those rooms
             sensors_in_chosen_rooms = smart_building.sensor_location_info.loc[ \
                               smart_building.sensor_location_info['roomname'].isin(room_names)]
-            sensor_numbers, sensor_names = choose_by_number(sensors_in_chosen_rooms)
+            sensor_numbers, sensor_names = Scraper._choose_by_number(sensors_in_chosen_rooms)
 
         # if isinstance(room_numbers, int):    
         #     room_names = smart_building.sensor_location_info['name'].loc[room_numbers]           
@@ -467,14 +463,14 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
         #     room_names = list(smart_building.sensor_location_info['name'].loc[room_numbers])
 
             
-            all_sensor_numbers, all_sensor_names = get_values_and_indexes(sensors_in_chosen_rooms)
+            all_sensor_numbers, all_sensor_names = Scraper._get_values_and_indexes(sensors_in_chosen_rooms)
 
         elif aggregate == 0:
             # choose from the sensors in those rooms
             ##TODO: this may already exist in code above
             sensors_in_chosen_rooms = smart_building.sensor_location_info.loc[ \
                               smart_building.sensor_location_info['roomname'].isin(room_names)]
-            sensor_numbers, sensor_names = choose_by_number(sensors_in_chosen_rooms)
+            sensor_numbers, sensor_names = Scraper._choose_by_number(sensors_in_chosen_rooms)
 
     #Choose the time range. E.g. 1st to 2nd March: [1583020800000, 1583107200000]
     if time == None:
@@ -529,7 +525,7 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
             sensors_in_chosen_rooms = smart_building.sensor_location_info.loc[ \
                   smart_building.sensor_location_info['roomname'].isin([room_name])]
     
-            sensor_numbers, sensor_names = get_values_and_indexes(sensors_in_chosen_rooms)
+            sensor_numbers, sensor_names = Scraper._get_values_and_indexes(sensors_in_chosen_rooms)
 
             try:
                 data_to_plot = retrieve_data(sensor_numbers, time_from, time_to, parameters)
@@ -572,7 +568,7 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
             sensors_in_chosen_rooms = smart_building.sensor_location_info.loc[ \
                   smart_building.sensor_location_info['roomname'].isin([room_name])]
     
-            sensor_numbers, sensor_names = get_values_and_indexes(sensors_in_chosen_rooms)
+            sensor_numbers, sensor_names = Scraper._get_values_and_indexes(sensors_in_chosen_rooms)
             
             
             data_to_plot = retrieve_data(sensor_numbers, time_from, time_to, parameters)
@@ -604,76 +600,6 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
             # overlay = 0
 
         return()
-
-##TODO: Copy and pasted from scraper as it was made a static method and therefore no longer accesible
-def get_values_and_indexes(dataframe, column_name='name'):
-    ''' Returns lists of values from coloumn_name in dataframe and corresponding index numbers.'''
-
-    value_nums = list(dataframe.index)
-    value_strings = list(dataframe[column_name])
-    return (value_nums, value_strings)
-        
-   ##TODO: Copy and pasted from scraper as it was made a static method and therefore no longer accesible    
-def choose_by_number(dataframe):
-    ''' Takes user input to choose from a list using the index column name.
-
-    Parameters
-    ----------
-    dataframe: panda dataframe
-        The dataframe from the Scraper() object (e.g. scraper.room_info) from which to choose.
-
-    Returns
-    -------
-    chosen_numbers: list of ints
-        List of numbers corresponding to chosen names.
-    chosen_names: list of strings
-        List of names corresponding to chosen numbers.
-    '''
-    list_description = dataframe.index.name
-    list_of_numbers, list_of_names = get_values_and_indexes(dataframe)
-
-    if len(list_of_numbers) == 1:
-        chosen_numbers = list_of_numbers
-        chosen_names = list_of_names
-        print('Only one {} available, so number {}: \'{}\' was selected '
-              'by default.'.format(list_description,
-                                   chosen_numbers[0],
-                                   list_of_names[0]))
-        return (chosen_numbers, chosen_names)
-
-    print("\nAvailable:")
-    for number, name in zip(list_of_numbers, list_of_names):
-        print("{} {}: {}.".format(list_description, number, name))
-
-    chosen_numbers = input(
-        'Choose by number. Use the format:\n \'1\' for single, \'1, 2, 3\''
-        'for multiple, or press enter for all.\n Use \'range()\' to return a '
-        'list (e.g.\'range(3,6)\' returns \'3,4,5\'):\n>>')
-
-    if not chosen_numbers:
-        chosen_numbers = list_of_numbers
-        chosen_names = list_of_names
-    else:
-        chosen_names = []
-        chosen_numbers = eval(chosen_numbers)
-
-        if isinstance(chosen_numbers, int):
-            chosen_numbers = [chosen_numbers]
-        elif isinstance(chosen_numbers, range) or \
-                isinstance(chosen_numbers, tuple):
-            chosen_numbers = list(chosen_numbers)
-
-        for number in chosen_numbers:
-            if number not in list_of_numbers or number <= 0:
-                sys.exit('\nBad index number {}.'.format(number))
-            else:
-                chosen_names.append(list_of_names[list_of_numbers.index(number)])
-
-    print('\nChosen:')
-    for (number, name) in zip(chosen_numbers, chosen_names):
-        print('{} {}: {}.'.format(list_description, number, name))
-
-    return (chosen_numbers, chosen_names)
 
 
 #%% Program starts here
