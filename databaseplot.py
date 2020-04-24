@@ -114,18 +114,15 @@ def retrieve_data(sensor_numbers, time_from=1580920305102, time_to=Scraper._time
     value_string = build_values_string(sensor_numbers)
 
 
-    param_list = ['occupancy', 'voc', 'co2', 'temperature', 'pressure', \
-                  'humidity', 'lux', 'noise']
-
     if parameters is None:
-        parameters = param_list
+        parameters = database.param_list
     
     if isinstance(parameters, list):
         param_string = build_param_string(parameters)
     elif isinstance(parameters, str):
         param_string = parameters
     else:
-        ('Format of input variable "paramaters" not recognised.')
+        ('Format of input variable "parameters" not recognised.')
 
     if isinstance(sensor_numbers, int):
         sql_params=[time_from, time_to, sensor_numbers]
@@ -175,10 +172,6 @@ def plot_from_dataframe(data_to_plot=None, aggregate=0):
     # get parameters from columns headings 
     column_headings = list(data_to_plot.columns)
     
-    # all paramters to look for in the dataframe.
-    all_param_labels = ['occupancy', 'voc', 'co2', 'temperature', \
-                   'pressure', 'humidity', 'lux', 'noise']
-
     # all labels
     if aggregate == 0:     
         all_plot_labels = ['Occupancy\n(n)', 'VOC\n(ppm)', 'CO2\n(ppm)',
@@ -197,9 +190,9 @@ def plot_from_dataframe(data_to_plot=None, aggregate=0):
     
     # find which parameters are included in dataframe and make lists
     for parameter in column_headings:
-        if parameter in all_param_labels:
-            paramlabels.append(all_param_labels[all_param_labels.index(parameter)])
-            plotlabels.append(all_plot_labels[all_param_labels.index(parameter)])
+        if parameter in database.param_list:
+            paramlabels.append(database.param_list[database.param_list.index(parameter)])
+            plotlabels.append(all_plot_labels[database.param_list.index(parameter)])
 
 
     # Convert times to datetime format
@@ -478,8 +471,7 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
 
     if parameters == None:
         # the labels to look for in the dataframe.
-        parameters = ['occupancy', 'voc', 'co2', 'temperature', \
-                       'pressure', 'humidity', 'lux', 'noise']
+        parameters = database.param_list
 
 
     #%% AGGREGATE = 0 OVERLAY = 0
@@ -578,7 +570,7 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
                 continue
             else:
                 
-                aggregated_data = aggregate_data(data_to_plot,parameters)
+                aggregated_data = aggregate_data(data_to_plot, parameters)
                 # aggregated_data = aggregated_data.rename_axis(None)
 
                 # https://towardsdatascience.com/why-and-how-to-use-merge-with-pandas-in-python-548600f7e738
