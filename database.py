@@ -174,7 +174,7 @@ class Database():
         earliest_time, sensor_reading_after_data = self.find_earliest_time()
     
         # put current time into variable
-        time_now = Scraper.time_now()
+        time_now = Scraper._time_now()
         
         # insert the first time
         self.insert_sensor_readings_after(sensor_reading_after_data)
