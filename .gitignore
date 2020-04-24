@@ -14,7 +14,7 @@ __pycache__
 .ipynb_checkpoints
 .spyproject
 SmartBuildingParameters
-Plots
+Plots/*
 
 # Executables
 *.swf
