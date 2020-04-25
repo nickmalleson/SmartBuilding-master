@@ -97,7 +97,7 @@ class Scraper():
             return(username, password, building_info)
         
         # If here then we weren't able to log on.
-        raise Exception('Problem logging in. The respone code is {} (200 is success)'.format(responsecheck))
+        raise Exception('Problem logging in. Response code: {} (success = 200).'.format(responsecheck))
 
     @staticmethod
     def _get_login_info():
@@ -139,7 +139,7 @@ class Scraper():
                 response_df = response_df.set_index('number')
             else:
                 response_df = response.json()
-        return response_df
+        return(response_df)
         
         # Failed if here
         print('API call failed with code: {}.'.format(status_code))
@@ -682,7 +682,7 @@ class Scraper():
         return (value_nums, value_strings)
 
     @staticmethod
-    def _choose_by_number(dataframe):
+    def _choose_by_number(dataframe, column_name='name'):
         ''' Takes user input to choose from a list using the index column name.
 
         Parameters
@@ -698,7 +698,7 @@ class Scraper():
             List of names corresponding to chosen numbers.
         '''
         list_description = dataframe.index.name
-        list_of_numbers, list_of_names = Scraper._get_values_and_indexes(dataframe)
+        list_of_numbers, list_of_names = Scraper._get_values_and_indexes(dataframe, column_name)
 
         if len(list_of_numbers) == 1:
             chosen_numbers = list_of_numbers

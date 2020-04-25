@@ -31,11 +31,28 @@ class Database():
 
     def __init__(self):
             self.sensor_location_info = self.get_table_info('sensors', 'sensor_number')
+            self.sensor_numbers = self.sensor_location_info.index.tolist()
+            self.sensor_names = self.sensor_location_info['sensor_name'].tolist()
             print("Sensor locations retrieved successfully.")
+
             self.room_info = self.get_table_info('rooms', 'room_number')
+            self.room_numbers = self.room_info.index.tolist()
+            self.room_names = self.room_info['room_name'].tolist()
             print("Room information retrieved successfully.")
-            self.param_list = ['occupancy', 'voc', 'co2', 'temperature', 'pressure', \
-                               'humidity', 'lux', 'noise']
+            
+            self.param_list = ['occupancy', 'voc', 'co2', 'temperature', \
+                               'pressure', 'humidity', 'lux', 'noise']
+
+
+            self.plot_labels = ['Occupancy\n(n)', 'VOC\n(ppm)', 'CO2\n(ppm)',
+                                    'Temperature\n(°C)', 'Pressure\n(mBar)',
+                                    'Humidity\n(RH)', 'Light Intensity\n(lux)',
+                                    'Noise Levels\n(dB)']
+            
+            self.plot_labels_aggregated = ['Occupancy\n(n, sum)', 'VOC\n(ppm, mean)', 'CO2\n(ppm, mean)',
+                                            'Temperature\n(°C, mean)', 'Pressure\n(mBar, mean)',
+                                            'Humidity\n(RH, mean)', 'Light Intensity\n(lux, mean)',
+                                            'Noise Levels\n(dB, mean)']
 
     def get_table_info(self,table, index_col):
         dataframe = pd.read_sql('select * from {};'.format(table), conn)
@@ -44,12 +61,12 @@ class Database():
 
 
 def choose_time():
-    ''' Get user input to choose a time in ms time epoch. 
+    ''' Take user input to choose a time in ms time epoch. 
     Times are equivalent to those at https://currentmillis.com/ '''
-    
-    # get time before earliest sensor reading.
+
+    # time before the earliest sensor reading in ms format
     earliest_time_ms = 1580920305102
-    # divide by 1000 because time is in ms and utcfromtimestamp takes input in s
+    # same time in utc format (/1000 as utcfromtimestamp takes input in s)
     earliest_time_utc = dt.datetime.utcfromtimestamp(int(earliest_time_ms/1000)).isoformat()
 
     # get time now
@@ -64,7 +81,7 @@ def choose_time():
                          .format(earliest_time_ms, earliest_time_utc,
                                  time_now_ms, time_now_utc))
 
-    # By default, choose from earilest time to now
+    # by default, choose from earilest time to now
     if not chosen_times:        
         time_from_ms = earliest_time_ms
         time_from_utc = earliest_time_utc
@@ -85,6 +102,7 @@ def choose_time():
 
 
 def build_param_string(parameters):
+    ''' Builds string of parameters for use in pd.read_sql. '''
 
     param_string = parameters[0]    
     for i in range(1,len(parameters)):
@@ -94,6 +112,7 @@ def build_param_string(parameters):
 
 
 def build_values_string(values):
+    ''' Builds string of sensor numbers for use in pd.read_sql. '''
 
     values_string = 'WHERE timestampms BETWEEN ? AND ? AND sensor_number = ? '
 
@@ -106,41 +125,62 @@ def build_values_string(values):
         return(values_string)
 
 
-def retrieve_data(sensor_numbers, time_from=1580920305102, time_to=Scraper._time_now(), parameters=None):
+def retrieve_data(sensor_numbers=None, time_from=1580920305102, time_to=Scraper._time_now(), parameters=None):
     ''' Retrieve data from the database based on sensor number and timeframe using pd.read_sql.
     https://stackoverflow.com/questions/24408557/pandas-read-sql-with-parameters/24418294 
+
+    Parameters
+    ----------
+    sensor_numbers : int or list of ints, optional
+        Default will use all sensor numbers
+    time_from : time from in ms format, optional
+        Default will use earliest sensor reading
+    time_to : time to in ms format, optional
+        Default will use current time
+    parameters : str or list of str, optional
+        Default will use all parameters
+
+    Returns
+    -------
+    Dataframe of data to plot.
+
     '''
 
-    value_string = build_values_string(sensor_numbers)
-
-
-    if parameters is None:
+    # build string for paramteres to input into pd.read_sql
+    if parameters is None: 
         parameters = database.param_list
-    
-    if isinstance(parameters, list):
         param_string = build_param_string(parameters)
-    elif isinstance(parameters, str):
+    elif isinstance(parameters, list): 
+        param_string = build_param_string(parameters)
+    elif isinstance(parameters, str): 
         param_string = parameters
-    else:
-        ('Format of input variable "parameters" not recognised.')
+    else: print('Format of input variable "parameters" not recognised.')
 
-    if isinstance(sensor_numbers, int):
-        sql_params=[time_from, time_to, sensor_numbers]
+    # build string for sensor numbers to input into pd.read_sql    
+    if sensor_numbers is None: 
+        sensor_numbers = database.sensor_numbers
+    
+    # string for parameter input to pd.read_sql
+    if isinstance(sensor_numbers, int): 
+        sql_params = [time_from, time_to, sensor_numbers]
     elif isinstance(sensor_numbers, list):
         sql_params = []
         for i in sensor_numbers:
             sql_params = sql_params + [time_from, time_to, i]
 
+    # build string for input 
+    value_string = build_values_string(sensor_numbers)
 
-    data_to_plot = pd.read_sql('SELECT time, timestampms, timestamputc, sensor_name, sensor_number, '\
-                               'sensorlocation, {} '\
+    # retrieve from database
+    data_to_plot = pd.read_sql('SELECT time, timestampms, timestamputc, '\
+                               'sensor_name, sensor_number, sensorlocation, {} '\
                                'FROM sensor_readings '\
                                '{}'\
-                               'ORDER BY timestamputc;' .format(param_string, value_string), \
-                             conn, params=sql_params  )
-    
-    ##TODO: add room_number and room_name to data here to simplify later code
+                               'ORDER BY timestamputc;' 
+                               .format(param_string, value_string), \
+                               conn, params=sql_params)
 
+    ##TODO: add room_number and room_name to data here to simplify later code
 
     if data_to_plot.empty:
         print('No data for this time range for sensor number {}.'.format(sensor_numbers))
@@ -156,16 +196,6 @@ def plot_from_dataframe(data_to_plot=None, aggregate=0):
     data_to_plot = dataframe from retrieve_data()
     sensor_number = int which corresponds to index in scraper.sensor_location_info.
     '''
-    
-    # if len(data_to_plot.sensor_number.unique()) != 1:
-        # aggregated = 1
-        # if room_number:
-            # print('Plotting aggregated data for room_number {}: {}.'\
-                  # .format(room_number, smart_building.room_info['name'].loc[room_number]))
-            # print('Error: "plot_from_dataframe" function can only take one sensor at a time.')
-    # else:
-        # aggregated = 0
-        # sensor_number = data_to_plot.sensor_number.unique()[0]
 
     ##TODO: first thing to do should be to sort data by sensor_number/room_number to make sure legends are accurate
     
@@ -174,19 +204,13 @@ def plot_from_dataframe(data_to_plot=None, aggregate=0):
     
     # all labels
     if aggregate == 0:     
-        all_plot_labels = ['Occupancy\n(n)', 'VOC\n(ppm)', 'CO2\n(ppm)',
-                  'Temperature\n(°C)', 'Pressure\n(mBar)',
-                  'Humidity\n(RH)', 'Light Intensity\n(lux)',
-                  'Noise Levels\n(dB)']
+        all_plot_labels = database.plot_labels
     else:
-        all_plot_labels = ['Occupancy\n(n, sum)', 'VOC\n(ppm, mean)', 'CO2\n(ppm, mean)',
-                  'Temperature\n(°C, mean)', 'Pressure\n(mBar, mean)',
-                  'Humidity\n(RH, mean)', 'Light Intensity\n(lux, mean)',
-                  'Noise Levels\n(dB, mean)']
+        all_plot_labels = database.plot_labels_aggregated
 
     # list for the ones to plot on the graph    
     paramlabels = []
-    plotlabels= []
+    plotlabels = []
     
     # find which parameters are included in dataframe and make lists
     for parameter in column_headings:
@@ -331,26 +355,57 @@ def plot_from_dataframe(data_to_plot=None, aggregate=0):
     plt.show()
 
 
-def aggregate_data(data_to_aggregate, parameters):
+def room_name_from_sensor_number(sensor_numbers):
+    '''Input list of sensor numbers, returns list of names of rooms that contain sensors.'''
+    room_names = database.sensor_location_info['room_name']\
+                          .loc[sensor_numbers].unique().tolist()                      
+    return(room_names)
 
-    # get sensor_numbers and sensor names from dataframe    
+
+def room_number_from_room_name(room_names):
+    ''' Input list of room numbers, returns list of corresponding room names .'''
+    room_numbers = \
+        database.room_info[database.room_info['room_name'] == room_names].index()
+    return(room_numbers)
+
+
+
+def aggregate_data(data_to_aggregate, parameters):
+    ''' Aggregates the data from all sensors in the dataframe providing they 
+    are from the same room. Can aggregate data from any number of sensors in a room,
+    but not sensors in different rooms. 
+    Process:
+    - Sorts dataframes and creates strings for the fields in output dataframe
+    - Ensures that there is only one reading per minute for each sensor
+        (takes average for each minute).
+    - Calculates sum of occupancy and mean of every other paramter
+    - Outputs the data a new dataframe.
+    
+    Parameters
+    ----------
+    data_to_aggregate : panda dataframe
+        Sensors must be in the same room.
+    parameters : list of str
+        List of parameter strs
+
+    Returns
+    -------
+    New dataframe of aggregated data. '''
+
+    # sort dataframe by sensor number then time
+    data_to_aggregate = data_to_aggregate.sort_values(by=['sensor_number', 'timestampms'])
+    
+    # get lists of sensor_numbers and sensor names from dataframe    
     sensor_numbers = data_to_aggregate['sensor_number'].unique().tolist()
     sensor_names = data_to_aggregate['sensor_name'].unique().tolist()
-    sensor_names_str = str(', '.join(sensor_names))
+
+    # convert list to str for use in field in output dataframe
     sensor_numbers_str = str(', '.join(str(x) for x in sensor_numbers))
+    sensor_names_str = str(', '.join(sensor_names))
 
-    ##TODO: this is used in plot_from_database so could be made into a function
-    # Would also be better if room name and number were contained in data_to_plot:
-    # need to change dataframe for this
-
-    # find which rooms are sensors are in from 'Database' class
-    # NOTE: aggregate_data() can only take 1 room at a time
-    room_name = database.sensor_location_info['room_name']\
-                          .loc[sensor_numbers].unique().tolist()[0]
-
-    room_number = \
-    database.room_info[database.room_info['room_name'] == room_name].index[0]
-
+    # find the room name and number from the sensor numbers    
+    room_name = room_name_from_sensor_number(sensor_numbers)[0]
+    room_number = room_number_from_room_name(room_name)[0]
 
     # round times in data_to_aggregate to the nearest minute
     data_to_aggregate['timestamputc'] = \
@@ -361,11 +416,11 @@ def aggregate_data(data_to_aggregate, parameters):
         data_to_aggregate[['timestamputc']].apply( \
         lambda x: x[0].timestamp(), axis=1).astype('int64')*1000
 
-    # Aggregate to get mean reading per sensor per minute
+    # aggregate to get mean reading per sensor per minute
     mean_per_minute_per_sensor = data_to_aggregate.groupby( \
              ['timestampms', 'sensor_number'], as_index=False)[parameters].mean()
 
-    # generate mean of mean 
+    # generate mean of mean (all parameters)
     mean_per_minute_total = mean_per_minute_per_sensor.groupby(['timestampms']).mean()
 
     # Get sum of occupcany
@@ -375,21 +430,19 @@ def aggregate_data(data_to_aggregate, parameters):
     aggregated_data = mean_per_minute_total
     aggregated_data['occupancy'] = occupancy_sum['occupancy']
 
-    # set the index to timestamp
+    # set the index to timestampms
     aggregated_data['timestampms'] = aggregated_data.index
     
-    # ADD 1 NANOSECOND TO PRESERVE TIME FORMAT. ESSENTIAL TO RUN.
+    # add 1 ns to preserve time format. (could be better way to do this).
     aggregated_data['timestamputc'] = aggregated_data['timestampms'] \
         .apply(lambda t: dt.datetime.utcfromtimestamp(int(t/1000)).isoformat()+'.000001+00:00')
-    # aggregated_data['timestamputc'] = aggregated_data['timestamputc'].apply(parse)
-        
+
+    #  set columns for the ouput dataframe from strings made earlier.      
     aggregated_data['room_name'] = room_name
     aggregated_data['room_number'] = room_number
     aggregated_data['sensor_name'] = sensor_names_str
     aggregated_data['sensor_number'] = sensor_numbers_str
  
-    
-    check_here=1
     return(aggregated_data)
 
 
@@ -400,7 +453,7 @@ def plot_from_database(room_numbers=None, sensor_numbers=None, time_from=1580920
     if(room_numbers == None and sensor_numbers == None):
         ##TODO: replace smart_building with database. E
         room_numbers, room_names = Scraper._choose_by_number(smart_building.room_info)
-        room_numbers, room_names = Scraper._choose_by_number(database.room_info)
+        room_numbers, room_names = Scraper._choose_by_number(database.room_info, 'room_name')
 
         if aggregate == 0:
             # choose from the sensors in those rooms
@@ -608,12 +661,22 @@ c = conn.cursor()
 # Create class instance to get info so scraper does not have to be called
 database = Database()
 
-sensor_numbers = database.sensor_location_info.index.tolist()
+#%% tests
 
+# empty (all defaults)
+plot_from_database()
+
+# input rooms
+plot_from_database('rooms')
+
+# sensors
+plot_from_database('sesnsors')
+
+# a = retrieve_data()
 
 # Try plotting 24 hours with different combinations of overlay and aggregate
-plot_from_database(room_numbers=[1,2,3], overlay=1, aggregate=1, time_from=1583280000000, \
-                    time_to = 1583366400000, parameters=['occupancy', 'noise'])
+#plot_from_database(room_numbers=[1,2,3], overlay=1, aggregate=1, time_from=1583280000000, \
+                    # time_to = 1583366400000, parameters=['occupancy', 'noise'])
     # , parameters='occupancy')
 
 # plot_from_database(sensor_numbers=sensor_numbers, overlay=1, aggregate=0, time_from=1583280000000, \
