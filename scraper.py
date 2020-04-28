@@ -682,13 +682,16 @@ class Scraper():
         return (value_nums, value_strings)
 
     @staticmethod
-    def _choose_by_number(dataframe, column_name='name'):
+    def _choose_by_number(dataframe_or_list, column_name='name'):
         ''' Takes user input to choose from a list using the index column name.
 
         Parameters
         ----------
-        dataframe: panda dataframe
-            The dataframe from the Scraper() object (e.g. scraper.room_info) from which to choose.
+        dataframe_or_list: panda dataframe or list
+            The dataframe from the Scraper() object (e.g. scraper.room_info) from which 
+            to choose, or a list. For lists, case column_name must also be included.
+        column_name: str, optional
+            The index of the column in the dataframe, or description of the list.
 
         Returns
         -------
@@ -697,8 +700,16 @@ class Scraper():
         chosen_names: list of strings
             List of names corresponding to chosen numbers.
         '''
-        list_description = dataframe.index.name
-        list_of_numbers, list_of_names = Scraper._get_values_and_indexes(dataframe, column_name)
+        if isinstance(dataframe_or_list, list):
+            if not column_name:
+                print('To choose from list, column name variable must be defined.')
+            else:
+                list_description = column_name
+            list_of_numbers = list(range(1, len(dataframe_or_list)+1))
+            list_of_names = dataframe_or_list
+        else:
+            list_description = dataframe_or_list.index.name
+            list_of_numbers, list_of_names = Scraper._get_values_and_indexes(dataframe_or_list, column_name)
 
         if len(list_of_numbers) == 1:
             chosen_numbers = list_of_numbers
