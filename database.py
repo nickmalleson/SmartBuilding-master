@@ -202,7 +202,7 @@ class Database():
 
     def __del__(self):
         '''Destructor commits any remaining data to the database and closes the connection'''
-        print("Closing connection to the databae")
+        print("Closing connection to the database")
         self.conn.commit()
         self.conn.close()
 
