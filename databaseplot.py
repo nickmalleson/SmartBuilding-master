@@ -30,6 +30,9 @@ class Database():
     '''
 
     def __init__(self):
+
+            self.conn, self.c = Database._connect_to_database()        
+
             self.sensor_location_info = \
                 self.get_table_info('sensors', 'sensor_number')
             self.sensor_numbers = self.sensor_location_info.index.tolist()
@@ -47,14 +50,25 @@ class Database():
 
 
             self.plot_labels = ['Occupancy\n(n)', 'VOC\n(ppm)', 'CO2\n(ppm)',
-                                    'Temperature\n(°C)', 'Pressure\n(mBar)',
-                                    'Humidity\n(RH)', 'Light Intensity\n(lux)',
-                                    'Noise Levels\n(dB)']
+                                'Temperature\n(°C)', 'Pressure\n(mBar)',
+                                'Humidity\n(RH)', 'Light Intensity\n(lux)',
+                                'Noise Levels\n(dB)']
             
             self.plot_labels_aggregated = ['Occupancy\n(n, sum)', 'VOC\n(ppm, mean)', 'CO2\n(ppm, mean)',
-                                            'Temperature\n(°C, mean)', 'Pressure\n(mBar, mean)',
-                                            'Humidity\n(RH, mean)', 'Light Intensity\n(lux, mean)',
-                                            'Noise Levels\n(dB, mean)']
+                                           'Temperature\n(°C, mean)', 'Pressure\n(mBar, mean)',
+                                           'Humidity\n(RH, mean)', 'Light Intensity\n(lux, mean)',
+                                           'Noise Levels\n(dB, mean)']
+
+
+    @staticmethod
+    def _connect_to_database():
+        # connect to database
+        conn = sqlite3.connect("./database.db")
+    
+        # Create a cursor to operate on the database
+        c = conn.cursor()
+        return(conn, c)     
+
 
     def get_table_info(self,table, index_col):
         dataframe = pd.read_sql('select * from {};'.format(table), conn)
@@ -68,6 +82,7 @@ def choose_time():
 
     # time before the earliest sensor reading in ms format
     earliest_time_ms = 1580920305102
+
     # same time in utc format (/1000 as utcfromtimestamp takes input in s)
     earliest_time_utc = dt.datetime.utcfromtimestamp(int(earliest_time_ms/1000)).isoformat()
 
@@ -148,7 +163,7 @@ def retrieve_data(sensor_numbers=None, time_from=None, time_to=None, parameters=
 
     '''
 
-    # Use defaults for unset parameters
+    # use defaults for unset parameters
     sensor_numbers, _, _, _, time_from, time_to, parameters, _, _, _ = \
         set_defaults(sensor_numbers=sensor_numbers, time_from=time_from, 
                      time_to=time_to, parameters=parameters)
@@ -182,7 +197,7 @@ def retrieve_data(sensor_numbers=None, time_from=None, time_to=None, parameters=
 
     # error message if no data returned
     if data_to_plot.empty:
-        _, _, room_number, room_name = get_names_and_numbers(sensors=sensor_numbers)
+        sensor_numbers, sensor_names, room_number, room_name = get_names_and_numbers(sensors=sensor_numbers)
         if isinstance(sensor_numbers, list):
             sensor_numbers_str = str(', '.join(str(x) for x in sensor_numbers))
         else:
@@ -192,151 +207,87 @@ def retrieve_data(sensor_numbers=None, time_from=None, time_to=None, parameters=
     return(data_to_plot)
 
 
-def plot_from_dataframe(data_to_plot=None, aggregate=0):
-    ''' Plot sensor data retrieved from database with retrieve_data(). 
-    Plots all types of data from one sensor number. No upper limit on how many 
-    datapoints.
-    
-    data_to_plot = dataframe from retrieve_data()
-    sensor_number = int which corresponds to index in scraper.sensor_location_info.
-    '''
+def plot_setup(data_to_plot, aggregate=0):
+    ''' Initialise dataframe and return variables required by plot_from_dataframe()'''
 
-    ##TODO: first thing to do should be to sort data by sensor_number/room_number to make sure legends are accurate
-    
+    #%% get plot title, axes labels, and legend labels, and organize dataframe for plotting
+
     # get parameters from columns headings 
-    column_headings = list(data_to_plot.columns)
+    column_headings = data_to_plot.columns.tolist()
     
-    # get labels and sort data
     data_to_plot.index.name = None
-    if aggregate == 0:     
+    if aggregate == 0:
+        
+        # get sensor_numbers and sensor names from dataframe    
+        sensor_numbers = data_to_plot['sensor_number'].unique().tolist()
+
+        # get the reset of the details
+        sensor_numbers, sensor_names, room_numbers, room_names = get_names_and_numbers(sensors=sensor_numbers)  
+
+        # set plot labels
         all_plot_labels = database.plot_labels
+        
+        # sort dataframe
         data_to_plot = data_to_plot.sort_values(by=['sensor_number', 'timestampms'])
-    else:
+
+        # generate plot title
+        if len(room_numbers) == 1:
+            if len(sensor_numbers) == 1:
+                plot_title = str('Readings from 1 sensor in {}'.format(room_names[0]))
+            elif len(sensor_numbers) == len(sensors_in_room(database.sensor_numbers, room_names[0])):
+                plot_title = str('Readings from all sensors in {}'.format(room_names[0]))
+            elif len(room_numbers) > 1:
+                plot_title = str('Readings from {} sensors in {}'.format(len(sensor_numbers), room_names[0]))
+        else:
+            plot_title = str('Sensor readings from {} rooms'.format(len(room_numbers)))
+
+        # define legend keys
+        legend_series = sensor_names
+
+    elif aggregate == 1:
+
+        # get room numbers and from dataframe    
+        room_numbers = data_to_plot['room_number'].unique().tolist()
+
+        # get sensor_numbers and sensor names from dataframe    
+        sensor_numbers = data_to_plot['sensor_number'].unique().tolist()
+
+        # get the reset of the details
+        _, sensor_names, room_numbers, room_names = get_names_and_numbers(rooms=room_numbers)
+        
+        # set plot labels
         all_plot_labels = database.plot_labels_aggregated
+        
+        # sort dataframe
         data_to_plot = data_to_plot.sort_values(by=['room_number', 'timestampms'])
 
-    # list for the ones to plot on the graph    
-    paramlabels = []
-    plotlabels = []
+        # generate plot title
+        if len(room_numbers) == 1:
+            plot_title = str('Aggregated sensor readings from room {}'.format(room_names[0]))
+        elif len(room_numbers) > 1:
+            plot_title = str('Aggregated sensor readings')
+
+        #define legend keys
+        legend_series = []
+        for room_number, room_name in zip(room_numbers, room_names):       
+            legend_str = str('Room number {}:\n        {}' .format(room_number, room_name))                
+            legend_series.append(legend_str)
+
+    # convert times to datetime format and set timestamputc as index (required to plot)
+    data_to_plot['timestamputc'] = pd.to_datetime(data_to_plot['timestamputc'])
+    data_to_plot = data_to_plot.set_index('timestamputc')
+
+    # generate lists for the labels to plot on the graph    
+    param_labels = []
+    plot_labels = []
     
     # find which parameters are included in dataframe and make lists
     for parameter in column_headings:
         if parameter in database.param_list:
-            paramlabels.append(database.param_list[database.param_list.index(parameter)])
-            plotlabels.append(all_plot_labels[database.param_list.index(parameter)])
+            param_labels.append(database.param_list[database.param_list.index(parameter)])
+            plot_labels.append(all_plot_labels[database.param_list.index(parameter)])
 
-
-    # Convert times to datetime format
-    data_to_plot['timestamputc'] =\
-        pd.to_datetime(data_to_plot['timestamputc'])
-    # set as index
-    data_to_plot = data_to_plot.set_index('timestamputc')
-
-
-    # get sensor_numbers and sensor names from dataframe    
-    sensor_numbers = data_to_plot['sensor_number'].unique().tolist()
-    ##TODO: list(set()) does not preserve order. Use below function instead
-    sensor_names = data_to_plot['sensor_name'].unique().tolist()
-
-    # make plot title
-    if aggregate == 0:
-        axtitle = str('Sensor readings')
-            # str('Sensor readings from sensor number {}: {}.'
-                      # .format(sensor_number,
-                          # smart_building.sensor_location_info['name'].loc[sensor_number]))
-        legend_series = sensor_names
-    elif aggregate == 1:
-        
-        ##TODO: this is used in plot_from_database so could be made into a function
-        # Would also be better if room name and number were contained in data_to_plot:
-        # need to change dataframe for this
-
-        # find which rooms sensors are in from 'Database' class
-        room_names = data_to_plot['room_name'].unique().tolist()
-        ##TODO: may need this when not plotting overlay =1 aggregate = 1        
-            # database.sensor_location_info['room_name']\
-                              # .loc[sensor_numbers]
-        room_numbers = list(database.room_info.loc[ \
-                        database.room_info['room_name'].isin(room_names)].index)
-
-        
-        axtitle = str('Aggregated sensor readings')
-        legend_series = []
-        # sensor_names_str = []
-        for room_number, room_name in zip(room_numbers, room_names):       
-            # sensor_names_str = str(', '.join(sensor_names))
-            legend_str = str('Room number {}:\n        {}' .format(room_number, room_name))
-            legend_series.append(legend_str)
-        # legend_series = room_names
-
-        # str('Aggregated sensor readings for room {}: {}.' 
-                      # .format(room_number, 
-                          # smart_building.room_info['name'].loc[room_number]))
-
-
-    #%% THIS WORKS AND ARE PROBABLY FOR BEST ONES
-
-    fontsizeL = 18
-    fontszieS = 16
-    
-    fig, axes = plt.subplots(len(paramlabels),  figsize=(20, 15), sharex=True)
-
-    if len(paramlabels)== 1:
-        axes = [axes]
-        
-    for j in range(0,len(paramlabels)):
-        for i, sensor_number in enumerate(sensor_numbers, start=0):
-            
-            current_data = data_to_plot[paramlabels[j]].loc[\
-                            data_to_plot['sensor_number']==sensor_number]
-                
-                
-            axes[j].plot(current_data, label = legend_series[i],
-                                                marker='.', alpha=0.5,
-                                                linewidth=1.5,
-                                                markersize=6)
-            axes[j].set_ylabel(plotlabels[j], rotation='horizontal',
-                       ha='right', va='baseline', fontsize=fontsizeL, wrap=True)
-            
-            
-
-    handles, labels = axes[-1].get_legend_handles_labels()
-
-    # axes = [plt.gca()]
-    pos1 = axes[0].get_position() # get the original position 
-    # pos2 = [pos1.x0, pos1.y0,  pos1.width*0.5, pos1] 
-    # # axes = plt.gca()
-    
-    # defaults: left = 0.125  ight = 0.9
-    plt.subplots_adjust(left=0.125, right=0.75)
-    # working ones: plt.subplots_adjust(left=0.125, right=0.8)
-    # axes.set_position(pos2) # set a new position
-
-    # box = axes[0].get_position()
-    # axes.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-    ##TODO: UserWarning: Creating legend with loc="best" can be slow with large amounts of data.
-    # fig.savefig(full_fig_name, dpi=500)   
-    leg = axes[0].legend(handles, labels, frameon=False, fontsize=fontsizeL, markerscale = 3,\
-                     bbox_to_anchor=(1, 1))
-        # , loc='upper left')
-        
-                     # , borderaxespad=0., loc='upper left', bbox_to_anchor=(1, plt.y1), loc=2, borderaxespad=0.)
-                    #was 9.5
-
-    fig.suptitle(axtitle, y=.95, fontsize=fontsizeL*2)
-
-    for line in leg.get_lines():
-        line.set_linewidth(3)
-
-    plt.xlabel('Time', fontsize=fontsizeL)
-    plt.rcParams.update({'font.size': fontszieS})
-
-    locator = mdates.AutoDateLocator(minticks=4, maxticks=8)
-    formatter = mdates.ConciseDateFormatter(locator)
-    axes[-1].xaxis.set_major_locator(locator)
-    axes[-1].xaxis.set_major_formatter(formatter)
-
-
+    #%% generate file name
     figtime = str(data_to_plot.index.min().floor('Min').replace(tzinfo=None))
     if aggregate == 1:
         numstr = str('_'.join(str(x) for x in room_numbers))
@@ -344,22 +295,100 @@ def plot_from_dataframe(data_to_plot=None, aggregate=0):
     else:
         numstr = str('_'.join(str(x) for x in sensor_numbers))
         fig_name = str(figtime+'_sensors_'+numstr)
-    
+
     if len(sensor_numbers) > 1:
         fig_name = str(fig_name + '_OL')
 
     fig_name = fig_name.replace(" ", "_")
     fig_name = fig_name.replace(":", "-")
+    file_name =  str('./Plots/{}.png'.format(fig_name))
 
-    full_fig_name =  str('./Plots/{}.png'.format(fig_name))
-    # full_fig_name =  'short'
-   
+    return(data_to_plot, sensor_numbers, sensor_names, room_numbers, 
+           room_names, param_labels, plot_labels, legend_series, plot_title, file_name)
+
+
+def plot_from_dataframe(data_to_plot, aggregate=0):
+    ''' Plot sensor data retrieved from database with retrieve_data(). 
+    Plots all types of data from one sensor number. No upper limit on how many 
+    datapoints. This is called for each plot generated.
     
-    # fig.savefig('../Plots/aaaa.png', dpi=500)
+    data_to_plot = dataframe from retrieve_data()
+    sensor_number = int which corresponds to index in scraper.sensor_location_info.
+    '''
 
-    fig.savefig(full_fig_name, dpi=500)
+    # check there is data to plot and warn if none.
+    if data_to_plot.empty:
+        print('No data to plot.')
+        return
 
+    # retrieve variables required to plot and organise dataframe in preparation
+    data_to_plot, sensor_numbers, sensor_names, room_numbers, room_names, param_labels, \
+        plot_labels, legend_series, plot_title, file_name = plot_setup(data_to_plot, aggregate)
+        
+        
+    # # use rooms or sensors for looping depending on aggregate
+    # if aggregate == 0:
+        
+
+    # size of small and large text
+    fontsizeL = 18
+    fontsizeS = 16
+
+    # initialise axes
+    fig, axes = plt.subplots(len(param_labels),  figsize=(20, 15), sharex=True)
+
+    if len(param_labels)== 1:
+        axes = [axes]
+        
+    # loops for plotting 
+    for j in range(0,len(param_labels)):
+        for i, sensor_number in enumerate(sensor_numbers, start=0):
+
+            current_data = data_to_plot[param_labels[j]].loc[\
+                            data_to_plot['sensor_number']==sensor_number]
+                
+            axes[j].plot(current_data, label = legend_series[i],
+                                                marker='.', alpha=0.5,
+                                                linewidth=1.5,
+                                                markersize=6)
+
+            axes[j].set_ylabel(plot_labels[j], rotation='horizontal',
+                       ha='right', va='baseline', fontsize=fontsizeL, wrap=True)
+
+    # get handles and labels for legend
+    handles, labels = axes[-1].get_legend_handles_labels()
+
+    # adjust position of plots so there is room for text in legend. defaults: left = 0.125  right = 0.9
+    plt.subplots_adjust(left=0.125, right=0.75)
+    
+    # set legend
+    leg = axes[0].legend(handles, labels, frameon=False, fontsize=fontsizeL, markerscale = 3,\
+                     bbox_to_anchor=(1, 1))
+
+    # set plot title
+    fig.suptitle(plot_title, y=.95, fontsize=fontsizeL*2)
+
+    # set line thickness in legend
+    for line in leg.get_lines():
+        line.set_linewidth(3)
+
+    # label x axis
+    plt.xlabel('Time', fontsize=fontsizeL)
+    plt.rcParams.update({'font.size': fontsizeS+2})
+
+    # conifgure the x axis for the optimal time range
+    locator = mdates.AutoDateLocator(minticks=4, maxticks=8)
+    formatter = mdates.ConciseDateFormatter(locator)
+    axes[-1].xaxis.set_major_locator(locator)
+    axes[-1].xaxis.set_major_formatter(formatter)
+
+    # save the plot
+    fig.savefig(file_name, dpi=500)
+    
+    # show the plot
     plt.show()
+    
+    return
 
 
 def aggregate_data(data_to_aggregate, parameters):
@@ -396,7 +425,7 @@ def aggregate_data(data_to_aggregate, parameters):
     sensor_names_str = str(', '.join(sensor_names))
 
     # find the room name and number from the sensor numbers
-    _, _, room_number, room_name = get_names_and_numbers(sensors=sensor_numbers)
+    sensor_numbers, sensor_names, room_number, room_name = get_names_and_numbers(sensors=sensor_numbers)
 
     # round times in data_to_aggregate to the nearest minute
     data_to_aggregate['timestamputc'] = \
@@ -439,6 +468,41 @@ def aggregate_data(data_to_aggregate, parameters):
 
 def set_defaults(sensor_numbers=None, sensor_names=None, room_numbers=None, room_names=None, 
                  time_from=None, time_to=None, parameters=None, overlay=None, aggregate=None, seperate=None):
+    '''
+    Takes parameters as input and returns those not already set to default.    
+
+    Parameters
+    ----------
+    sensor_numbers : LIST of INT, optional
+        List of INT corresponding to sensor numbers. Default = all.
+    sensor_names : LIST of STR, optional
+        List of STR corresponding to sensor names. Default = all.
+    room_numbers : LIST of STR, optional
+        List of INT corresponding to room numbers. Default = all.
+    room_names : LIST of STR, optional
+        List of STR corresponding to room names. Default = all.
+    time_from : INT, optional
+        First time to plot in ms timestamp format. Default = first available.
+    time_to : INT, optional
+        Last time to plot in ms timestamp format. Default = most recent available.
+    parameters : LIST of STR, optional
+         Choice of parameters from Database.param_list. Default = all.
+    overlay : INT, optional
+        0 = seperate plots, 1 = overlay on same plot. Default = 1.
+    aggregate : INT, optional
+        0 = individual sensors, 1 = aggregate sensors in same room. Default = 0.
+    seperate : INT, optional
+        0 = 1 sensors from different rooms on same plot, 1 = sensors from different
+        rooms are plotted seperately. Only relevant if overlay = 1 and aggregate = 0.
+        Default = 1.
+
+    Returns
+    -------
+    Parameters with unset parameters set to default.
+
+    '''
+    
+    sensor_numbers, sensor_names, room_number, room_name = get_names_and_numbers(sensors=sensor_numbers)
 
     if sensor_numbers == None:
         sensor_numbers = database.sensor_numbers
@@ -449,7 +513,9 @@ def set_defaults(sensor_numbers=None, sensor_names=None, room_numbers=None, room
     if room_names == None:
         room_names = database.room_names
     if time_from == None:
-        time_from = 1580920305102
+        # time_from = Scraper._time_now() - 86400000 # previous 24 hours
+        # time_from = Scraper._time_now() - 604800000 # previous week
+        time_from = 1580920305102 # from first sensor reading
     if time_to == None:
         time_to=Scraper._time_now()
     if parameters == None:
@@ -473,7 +539,7 @@ def choose_from_command_line(input_choice, sensors=None, rooms=None, time_from=N
     Takes user input to generate plot from command line. Minimum requirement is entering 
     either 'sensors' or 'rooms' to choose from. All other parameters are provided as 
     they can be set in command line so that the user is only prompted to change unset parameters.
-
+    
     Parameters
     ----------
     input_choice : STR
@@ -486,23 +552,12 @@ def choose_from_command_line(input_choice, sensors=None, rooms=None, time_from=N
         If ints: [1, 2, 3] 
         If str: ['0-Café', '0-Exhibition-Area', '2-Open-Office']
         Can also read individual values not in lists. Default collects all available.
-    time_from : INT, optional
-        First time to plot in ms timestamp format. Default is first available.
-    time_to : INT, optional
-        Last time to plot in ms timestamp format. Default is most recent available.
-    parameters : LIST of STR, optional
-         Choice of parameters from Database.param_list. Default is all.
-    overlay : INT, optional
-        0 = seperate plots, 1 = overlay on same plot. Default = 1.
-    aggregate : INT, optional
-        0 = individual sensors, 1 = aggregate sensors in same room. The default = 0.
-    seperate : INT, optional
-        0 = 1 sensors from different rooms on same plot, 1 = sensors from different
-        rooms are plotted seperately. Only relevant if overlay = 1 and aggregate = 0.
-
+    
+    See set_defaults() docstring for further information on parameters.
+    
     Returns
     -------
-    Parameter choices.
+    Parameters set depending non user input.
 
     '''
 
@@ -592,7 +647,25 @@ def choose_from_command_line(input_choice, sensors=None, rooms=None, time_from=N
 
 
 def get_names_and_numbers(sensors=None, rooms=None):
-    '''Input list of sensor numbers, returns list of names of rooms that contain sensors.'''
+    '''Input a list of one the following: sensor numbers, sensor names, 
+    room numbers, or room names. Returns lists of the others that correspond 
+    to the input. For example: input list of sensor numbers, receive a corresponding 
+    list of sensor names, a list of the room numbers which contain these sensors, 
+    and a list of room names which corresponds to the room numbers. 
+
+    Important to specify 'rooms' or 'sensors'.
+
+    Duplicates are removed from the lists, and all lists are sorted according to their 
+    corresponding number in the Database() class. Therefore recommended to assign an 
+    output variable for the same as the input:
+
+        e.g. if input is sensors=[3,3,2,1], output for sensor_numbers will be [1,2,3]).        
+
+    '''
+    
+    # use these to simplify code in the following sections
+    sensor_info = database.sensor_location_info
+    room_info = database.room_info
 
     if isinstance(sensors, int) or isinstance(sensors, str):
         sensors = [sensors]
@@ -601,31 +674,29 @@ def get_names_and_numbers(sensors=None, rooms=None):
 
     if sensors:
         if isinstance(sensors[0], int): # if sensor numbers, define sensor names and numbers
-            sensor_numbers = sensors
-            sensor_names = database.sensor_location_info['sensor_name'].loc[sensors].tolist()
+            sensor_numbers = sensor_info.loc[sensors].sort_index().index.unique().tolist()
+            sensor_names = sensor_info['sensor_name'].loc[sensor_numbers].tolist()
         elif isinstance(sensors[0], str): # if sensor names, define sensor names and numbers
-            sensor_names = sensors
-            sensor_numbers = database.sensor_location_info.loc[ \
-                           database.sensor_location_info['sensor_name'].isin(sensor_names)].index.tolist()
+            sensor_names = sensor_info.loc[sensor_info['sensor_name'].isin(sensors)]['sensor_name'].tolist()
+            sensor_numbers = sensor_info.loc[sensor_info['sensor_name'].isin(sensor_names)].index.tolist()
 
-        # get a list of which room each sensor is in with no duplicates and get room numbers from these
-        room_names = list(set(database.sensor_location_info['room_name'].loc[sensor_numbers]))
-        room_numbers = database.room_info.loc[ \
-                          database.room_info['room_name'].isin(room_names)].index.tolist()
+        # get a list of which room each sensor is in with no duplicates 
+        room_names = sensor_info['room_name'].loc[sensor_numbers].unique().tolist()
+        # sort these so they are in order of room number
+        room_names = room_info.loc[room_info['room_name'].isin(room_names)]['room_name'].tolist()
+        # get corresponding numbers
+        room_numbers = room_info.loc[room_info['room_name'].isin(room_names)].index.tolist()
     elif rooms:
         if isinstance(rooms[0], int): # if room numbers, define room names and numbers
-            room_numbers = rooms
-            room_names = database.room_info['room_name'].loc[rooms].tolist()
+            room_numbers = room_info.loc[rooms].sort_index().index.unique().tolist()
+            room_names = room_info['room_name'].loc[room_numbers].tolist()
         elif isinstance(rooms[0], str): # if sensor names, define sensor names and numbers
-            room_names = rooms
-            room_numbers = database.room_info.loc[ \
-                          database.room_info['room_name'].isin(room_names)].index.tolist()
+            room_names = room_info.loc[room_info['room_name'].isin(rooms)]['room_name'].tolist()
+            room_numbers = room_info.loc[room_info['room_name'].isin(room_names)].index.tolist()
 
-        sensor_numbers = database.sensor_location_info.loc[ \
-                          database.sensor_location_info['room_name'].isin(room_names)].index.tolist()
+        sensor_numbers = sensor_info.loc[sensor_info['room_name'].isin(room_names)].index.tolist()
         # get a list of which room each sensor is in with no duplicates and get room numbers from these
-        sensor_names = set(list(database.sensor_location_info['sensor_name'].loc[sensor_numbers]))
-
+        sensor_names = sensor_info['sensor_name'].loc[sensor_numbers].unique().tolist()
     else:
         sensor_numbers=None
         sensor_names=None
@@ -637,8 +708,33 @@ def get_names_and_numbers(sensors=None, rooms=None):
 
 def plot_from_database(choose_by_input=None, sensors=None, rooms=None, time_from=None, \
                        time_to=None, parameters=None, overlay=None, aggregate=None, seperate=None):
+    '''
+    Evaluates inputs to plot from from database. Determines whether user to take user input to 
+    from command line, and if not, plots using the parameters set in the input with all others
+    set to default. With no inputs, all are set to default. 
+    To choose from command line, minimum required input is 'sensors' or 'rooms'. Other parameters 
+    are can be set and they will not be promopted for in command line.
     
-    # first section of code deals with establishing the parameters
+    Parameters
+    ----------
+    choose_by_input_ : STR
+        Enter either 'sensors' or 'rooms'. Prompts will adjust accordingly.
+    sensors : single/LIST of INT or STR, optional
+        If ints: [1, 2, 3] 
+        If str: ['0-Café-1', '0-Café-2', '0-Cafe-3']
+        Can also read individual values not in lists. Default collects all available.
+    rooms : single/LIST of INT or STR, optional
+        If ints: [1, 2, 3] 
+        If str: ['0-Café', '0-Exhibition-Area', '2-Open-Office']
+        Can also read individual values not in lists. Default collects all available.
+    
+    See set_defaults() docstring for further information on parameters.
+    
+    Returns
+    -------
+    None
+    '''
+    #%% first, establish the parameters for plotting
     
     # retrieve room and sensor names and numbers from the list of ints or str input in sensors or rooms
     sensor_numbers, sensor_names, room_numbers, room_names = get_names_and_numbers(sensors, rooms)
@@ -653,7 +749,7 @@ def plot_from_database(choose_by_input=None, sensors=None, rooms=None, time_from
             set_defaults(sensor_numbers, sensor_names, room_numbers, room_names, time_from, time_to, parameters, overlay, aggregate, seperate)
 
 
-    #%% AGGREGATE = 0 OVERLAY = 0
+    #%% aggregate = 0 overlay = 0
     if aggregate == 0 and overlay == 0:
         for sensor_number, sensor_name in zip(sensor_numbers, sensor_names):
             data_to_plot = retrieve_data(sensor_number, time_from, time_to, parameters)        
@@ -665,7 +761,7 @@ def plot_from_database(choose_by_input=None, sensors=None, rooms=None, time_from
         return
 
 
-    #%% AGGREGATE = 0 OVERLAY = 1
+    #%% aggregate = 0 overlay = 1
     elif aggregate == 0 and overlay ==1:
         if seperate == 1:
             for room_number, room_name in zip(room_numbers, room_names):
@@ -688,7 +784,7 @@ def plot_from_database(choose_by_input=None, sensors=None, rooms=None, time_from
                  return
 
 
-    #%% AGGREGATE = 1 OVERLAY = 0                    
+    #%% aggregate = 1 overlay = 0                    
     elif aggregate ==1 and overlay ==0:
         for room_number, room_name in zip(room_numbers, room_names):
             sensors_in_current_room = sensors_in_room(sensor_numbers, room_name)
@@ -705,7 +801,7 @@ def plot_from_database(choose_by_input=None, sensors=None, rooms=None, time_from
         return
 
 
-    #%% AGGREGATE = 1 OVERLAY = 1                      
+    #%% aggregate = 1 overlay = 1                      
     elif aggregate == 1 and overlay==1:
         aggregated_dfs = pd.DataFrame
         for room_number, room_name in zip(room_numbers, room_names):
@@ -731,6 +827,7 @@ def sensors_in_room(sensor_numbers, room_name):
     ''' Returns all sensors in a list which are in a specified room. List does
     not have to be complete list of sensors.'''
     
+    sensor_numbers.sort()
     sensors_in_current_room = []
     for sensor_number in sensor_numbers:
         if database.sensor_location_info['room_name'].loc[sensor_number] == room_name:
@@ -749,9 +846,6 @@ c = conn.cursor()
 
 # Create class instance to get info so scraper does not have to be called
 database = Database()
-
-# plot_from_data
-# # run programbase()
 
 #close the connection
 conn.close()

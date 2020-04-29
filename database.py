@@ -41,8 +41,7 @@ class Database():
     
         # Create a cursor to operate on the database
         c = conn.cursor()
-        return(conn, c)
-      
+        return(conn, c)     
  
     
     def _retrieve_existing_readings(self):
