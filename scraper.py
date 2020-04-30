@@ -1,29 +1,29 @@
 # -*- coding: utf-8 -*-
-'''
+"""
 scraper.py
 
-Script for accesing the API of the Connected Places Smart Building using python
+Script for accessing the API of the Connected Places Smart Building using python
 and the "requests" library.
 
 Created on Thu Oct 17 16:11:16 2019
 
 @author: Thomas Richards
 
-'''
+"""
 import getpass  # required to keep password invisible
 from matplotlib.ticker import MaxNLocator
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import pandas as pd
-import requests as r  # required to acesss API
+import requests as r  # required to access API
 import sys
 import time
 import datetime as dt
 from dateutil.parser import parse
 
 class Scraper():
-    '''Obtains login details and stores data associated with the account in co-
-    stant variables.
+    '''Obtains login details and stores data associated with the account in
+    constant variables.
     '''
 
     def __init__(self, login=True):
@@ -98,7 +98,8 @@ class Scraper():
         
         # If here then we weren't able to log on.
         raise Exception('Problem logging in. Response code: {} (success = 200).'.format(responsecheck))
-
+        
+        
     @staticmethod
     def _get_login_info():
         ''' Get login username and password from locally stored parameter file.'''
@@ -122,7 +123,7 @@ class Scraper():
             https://console.beringar.co.uk/api/<function_name>/
 
         :param function_name: the name of the API function to call
-        :return: the json returned by the response if successfull (converted 
+        :return: the json returned by the response if successful (converted
         from a dict to a dataframe) or raise an IOError if the call failed.
         """
         url = 'https://console.beringar.co.uk/api/{}'.format(function_name)
@@ -130,7 +131,7 @@ class Scraper():
         response = r.get(url, auth=(self.username, self.password))
         status_code = response.status_code
 
-        # Sucess code = 200, Failed = 400 (simplified).
+        # Success code = 200, Failed = 400 (simplified).
         if 200 <= status_code < 300:
             # Response as OK.
             if response.json():
@@ -282,7 +283,7 @@ class Scraper():
         Returns
         -------
         managed_space_latest_data: dataframe containing one row for each responsive sensor. 
-        The 'spacenumbers' column match indices in 'self.managed_space_info'.
+        The 'spacenumber' column match indices in 'self.managed_space_info'.
 
         '''
 
@@ -302,15 +303,15 @@ class Scraper():
             managed_space_latest_data = self._call_API(function_name)
                         # if the API call fails, state this and move to next
         except Exception as e:
-            print('Could not aquire latest managed space data from building number {}: {}.'
-                  ' PROBLEM AQUIRING DATA. Error: {}' .format(1, self.building_info['name'].loc[building_number], str(e)))
+            print('Could not acquire latest managed space data from building number {}: {}.'
+                  ' PROBLEM ACQUIRING DATA. Error: {}' .format(1, self.building_info['name'].loc[building_number], str(e)))
 
         # Check the ids of the returned managed spaces against all those available and return a list of corresponding indices from 'self'
         returned_space_numbers = []
         for space_id in managed_space_latest_data['managedspace']:                    
             returned_space_numbers.append(int(self.managed_space_info[self.managed_space_info['id']==space_id].index.values))
       
-        # add new column in respnse which corresponds with indices from self, sort, and make it the index column
+        # add new column in response which corresponds with indices from self, sort, and make it the index column
         managed_space_latest_data['spacenumber'] = returned_space_numbers
         managed_space_latest_data = managed_space_latest_data.sort_values(by=['spacenumber'], inplace=False)
         managed_space_latest_data = managed_space_latest_data.set_index(['spacenumber'])
@@ -321,7 +322,7 @@ class Scraper():
                 print('Managed space location number {}: {}. NO DATA RETURNED.'
                       .format(i, self.managed_space_info['name'].loc[i]))
        
-        print('Latest managed space readings aquired successfully from: {} of {} possible sensors.'
+        print('Latest managed space readings acquired successfully from: {} of {} possible sensors.'
               .format(len(returned_space_numbers), len(all_possible_space_numbers)))
 
         return(managed_space_latest_data, returned_space_numbers)
@@ -395,8 +396,8 @@ class Scraper():
             try:
                 response = self._call_API(function_name)
             except Exception as e:
-                print('Sensor number {}: {}. PROBLEM AQUIRING '
-                      'DATA. Error: {}' .format(sensor_num, sensor['name'], str(e)))
+                print("Sensor number {}: {}. PROBLEM AQUIRING "
+                      "DATA. Error: {}".format(sensor_num, sensor['name'], str(e)))
                 fail += 1
 
             if not isinstance(response, pd.core.frame.DataFrame):
@@ -432,6 +433,7 @@ class Scraper():
 
         return(sensor_reading_after_data, sensor_locations)
 
+
     def sensor_reading_latest(self, building_number=1):
         ''' Get latest sensor readings from sensor locations of (default) building number 1. 
         Since the API call returns a list which excludes non-responsive sensors, 
@@ -460,8 +462,8 @@ class Scraper():
             sensor_reading_latest = self._call_API(function_name)
                         # if the API call fails, state this and move to next
         except Exception as e:
-            print('Could not aquire latest sensor reading data from building number {}: {}.'
-                  ' PROBLEM AQUIRING DATA. Error: {}' .format(1, self.building_info['name'].loc[building_number], str(e)))
+            print('Could not acquire latest sensor reading data from building number {}: {}.'
+                  ' PROBLEM ACQUIRING DATA. Error: {}' .format(1, self.building_info['name'].loc[building_number], str(e)))
 
         # Check the ids of the returned sensor locations against all those available and return a list of corresponding indices from 'self'
         returned_sensor_numbers = []
@@ -474,7 +476,7 @@ class Scraper():
         sensor_reading_latest['timestamputc'] = sensor_reading_latest['timestamputc'].apply(parse)
         sensor_reading_latest['timestampms'] = sensor_reading_latest[['timestamputc']].apply(lambda x: x[0].timestamp(), axis=1).astype('int64')*1000
         
-        # add new column in respnse which corresponds with indices from self, sort, and make it the index column
+        # add new column in response which corresponds with indices from self, sort, and make it the index column
         sensor_reading_latest['sensornumber'] = returned_sensor_numbers
         sensor_reading_latest = sensor_reading_latest.sort_values(by=['sensornumber'], inplace=False)
         sensor_reading_latest = sensor_reading_latest.set_index(['sensornumber'])
@@ -491,7 +493,7 @@ class Scraper():
                 print('Sensor number {}: {}. NO DATA RETURNED.'
                       .format(i, self.sensor_location_info['name'].loc[i]))
        
-        print('Latest sensor readings aquired successfully from: {} of {} possible sensors.'
+        print('Latest sensor readings acquired successfully from: {} of {} possible sensors.'
               .format(len(returned_sensor_numbers), len(all_possible_sensor_numbers)))
 
         return(sensor_reading_latest, returned_sensor_numbers)
@@ -532,7 +534,7 @@ class Scraper():
 
         print('\nPlotting managed space sensor data.')
 
-        legendlabels = []
+        legend_labels = []
 
         for data, space_number in zip(managed_space_after_data,
                                       managed_spaces):
@@ -541,24 +543,24 @@ class Scraper():
                     space_number, self.managed_space_info['name'].loc[space_number]))
                 continue
             else:
-                legendlabels.append(
+                legend_labels.append(
                     self.managed_space_info['name'].loc[space_number])
                 print('Managed space number {}: {}. Data Available. '
                       'Plotting chart.'
                       .format(space_number,
                               self.managed_space_info['name'].loc[space_number]))
 
-            currentdataframe = data
-            currentdataframe['rxtimestamputc'] = \
-                pd.to_datetime(currentdataframe['rxtimestamputc'])
-            currentdataframe = currentdataframe.set_index('rxtimestamputc')
-            axes = currentdataframe['occupancy'].plot(marker='.',
+            current_dataframe = data
+            current_dataframe['rxtimestamputc'] = \
+                pd.to_datetime(current_dataframe['rxtimestamputc'])
+            current_dataframe = current_dataframe.set_index('rxtimestamputc')
+            axes = current_dataframe['occupancy'].plot(marker='.',
                                                       alpha=0.5, figsize=(12, 18),
                                                       linewidth=1, markersize=2.5)
 
         try:
             axes
-            axes.legend(legendlabels, loc='upper right')
+            axes.legend(legend_labels, loc='upper right')
             axes.yaxis.set_major_locator(MaxNLocator(integer=True))
             plt.xlabel('Time')
             plt.title('Occupancy of managed spaces')
@@ -576,7 +578,7 @@ class Scraper():
     def plot_sensor_reading_after(self, sensor_numbers=None,
                                   sensor_reading_after_data=None):
         ''' Plot sensor data (after). Data from each sensor are plotted on
-        seperate axes. If 'sensor_reading_after_data' is included, historical data
+        separate axes. If 'sensor_reading_after_data' is included, historical data
         can be plotted, else, API is called to retrieve real-time data to plot.
 
         Parameters
@@ -611,7 +613,7 @@ class Scraper():
 
         print('\nPlotting sensor data.')
 
-        labelsdone = 0
+        labels_done = 0
         for data, sensor_number in zip(sensor_reading_after_data,
                                        sensor_numbers):
             if not any(data):
@@ -624,11 +626,11 @@ class Scraper():
                       .format(sensor_number,
                               self.sensor_location_info['name'].loc[sensor_number]))
                 # this section to obtain plot
-                if labelsdone == 0:
-                    paramlabels = ['occupancy', 'voc', 'co2', 'temperature',
+                if labels_done == 0:
+                    param_labels = ['occupancy', 'voc', 'co2', 'temperature',
                                    'pressure', 'humid', 'lux', 'noise']
                    
-                    plotlabels = ['Occupancy\n(n)', 'VOC\n(ppm?)', 'CO2\n(ppm?)',
+                    plot_labels = ['Occupancy\n(n)', 'VOC\n(ppm?)', 'CO2\n(ppm?)',
                                   'Temperature\n(°C)', 'Pressure\n(mBar)',
                                   'Humidity\n(RH)', 'Light Intensity\n(lux)',
                                   'Noise Levels\n(dB)']
@@ -639,18 +641,18 @@ class Scraper():
                 current_dataframe = current_dataframe.set_index(
                     'timestamputc')
 
-                axtitle = str('Sensor readings (after) from sensor number {}: {}.'
+                plot_title = str('Sensor readings (after) from sensor number {}: {}.'
                               .format(sensor_number,
                                       self.sensor_location_info['name'].loc[sensor_number]))
-                axes = current_dataframe[paramlabels].plot(marker='.', alpha=0.5,
+                axes = current_dataframe[param_labels].plot(marker='.', alpha=0.5,
                                                            figsize=(12, 26),
                                                            subplots=True,
                                                            linewidth=1,
                                                            markersize=2.5,
-                                                           title=axtitle)
+                                                           title=plot_title)
 
                 for i, ax in enumerate(axes, start=0):
-                    ax.set_ylabel(plotlabels[i], rotation='horizontal',
+                    ax.set_ylabel(plot_labels[i], rotation='horizontal',
                                   fontsize=10, ha='right', va='baseline')
 
                 plt.xlabel('Time')
@@ -675,7 +677,7 @@ class Scraper():
 
     @staticmethod
     def _get_values_and_indexes(dataframe, column_name='name'):
-        ''' Returns lists of values from coloumn_name in dataframe and corresponding index numbers.'''
+        ''' Returns lists of values from column_name in dataframe and corresponding index numbers.'''
 
         value_nums = list(dataframe.index)
         value_strings = list(dataframe[column_name])
