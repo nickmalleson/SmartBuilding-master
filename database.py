@@ -16,34 +16,32 @@ import pandas as pd
 import argparse
 
 
-#%%
+# %%
 class Database():
     '''Obtains details of existing database entries.
     '''
 
     def __init__(self):
-            
-        self.conn, self.c = Database._connect_to_database()        
+
+        self.conn, self.c = Database._connect_to_database()
         self.existing_readings = Database._retrieve_existing_readings(self)
         self.smart_building = Scraper()
 
-
     @staticmethod
     def _connect_to_database():
-        ##TODO: DODGY USE OF GLOBAL VARIABLES WHILST TESTING. NEEDS SORTING OUT
+        # TODO: DODGY USE OF GLOBAL VARIABLES WHILST TESTING. NEEDS SORTING OUT
         # Connect to the database (creates a Connection object)
         # global conn, c
-    
+
         # global conn, c
 
         # connect to database
         conn = sqlite3.connect("./database.db")
-    
+
         # Create a cursor to operate on the database
         c = conn.cursor()
-        return(conn, c)     
- 
-    
+        return(conn, c)
+
     def _retrieve_existing_readings(self):
         '''Obtains details of existing database entries to check against.
         Returns a dataframe containing a list of existing time readings and
@@ -51,145 +49,140 @@ class Database():
         '''
 
         try:
-            existing_readings = pd.read_sql('SELECT timestampms, sensorlocation ' \
-                                            'FROM sensor_readings '\
-                                            'ORDER BY timestamputc;',     
+            existing_readings = pd.read_sql('SELECT timestampms, sensorlocation '
+                                            'FROM sensor_readings '
+                                            'ORDER BY timestamputc;',
                                             self.conn)
-            ##TODO: This check does not currently function properly or check the right thing
-            if any(existing_readings.applymap(type)==bytes):
-                print("Database contains timestamps in 'bytes' format when they "\
-                        "should be int64.")
+            # TODO: This check does not currently function properly or check the right thing
+            if any(existing_readings.applymap(type) == bytes):
+                print("Database contains timestamps in 'bytes' format when they "
+                      "should be int64.")
             return(existing_readings)
-        except Exception as e:        
-            print("Error: ", e)       
-
+        except Exception as e:
+            print("Error: ", e)
 
     def insert_row(self, row):
         try:
-            check = self.c.execute('INSERT INTO sensor_readings (time, timestampms, timestamputc, '\
-                'sensor_number, sensor_name, co2, humidity, lux, noise, occupancy, '\
-                'pressure, sensorlocation, temperature, voc) '\
-                'VALUES(strftime(?,?),?,?,?,?,?,?,?,?,?,?,?,?,?)', \
-                ['%s','now', row['timestampms'], str(row['timestamputc']), 
-                 row['sensornumber'], \
-                 row['name'], \
-                 row['co2'], row['humid'], row['lux'], row['noise'], \
-                 row['occupancy'], row['pressure'], row['sensorlocation'], \
-                 row['temperature'], row['voc']])
-        except Exception as e:        
+            check = self.c.execute('INSERT INTO sensor_readings (time, timestampms, timestamputc, '
+                                   'sensor_number, sensor_name, co2, humidity, lux, noise, occupancy, '
+                                   'pressure, sensorlocation, temperature, voc) '
+                                   'VALUES(strftime(?,?),?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                                   ['%s', 'now', row['timestampms'], str(row['timestamputc']),
+                                    row['sensornumber'],
+                                       row['name'],
+                                       row['co2'], row['humid'], row['lux'], row['noise'],
+                                       row['occupancy'], row['pressure'], row['sensorlocation'],
+                                       row['temperature'], row['voc']])
+        except Exception as e:
             print("Error: ", e)
-
 
     def check_for_duplicates(self, row):
         ''''Check whether sensor reading exists in database for this sensor and time (ms).'''
         if self.existing_readings is None:
             return(0)
         else:
-            test = self.existing_readings.loc[ \
-                      (self.existing_readings['timestampms'] == row['timestampms']) & \
-                      (self.existing_readings['sensorlocation'] == row['sensorlocation'])]
+            test = self.existing_readings.loc[
+                (self.existing_readings['timestampms'] == row['timestampms']) &
+                (self.existing_readings['sensorlocation'] == row['sensorlocation'])]
 
         if len(test) > 0:
             return(1)
         else:
             return(0)
 
+    # %% Some functions
 
-    #%% Some functions
     def insert_sensor_readings_latest(self, sensor_reading_latest_data):
         ''' Tries to insert data from the API in to the database using output from
         scraper.sensor_reading_latest() '''
-    
+
         print('\nTrying to insert "sensor_reading_latest_data"...')
-        
+
         # For checking whether there is already a reading with same time index
         duplicates = 0
-        
+
         # loop through the rows (sensor readings)
-        for sensor_number, row in sensor_reading_latest_data.iterrows():    
-            #%% check whether there is already a sensor reading for this sensor at this time and pass continue if there is
+        for sensor_number, row in sensor_reading_latest_data.iterrows():
+            # %% check whether there is already a sensor reading for this sensor at this time and pass continue if there is
             if self.check_for_duplicates(row) == 1:
                 print('Sensor {}: {} already has reading for time {}.'
-                      .format(sensor_number, 
-                              self.smart_building.sensor_location_info['name'].loc[sensor_number], 
+                      .format(sensor_number,
+                              self.smart_building.sensor_location_info['name'].loc[sensor_number],
                               row['timestamputc']))
-                duplicates +=1 
+                duplicates += 1
                 continue
-        
+
             self.insert_row(row)
-            
+
         print('Readings from {} sensor(s) skipped as sensor reading(s) already existed for that time.'
               .format(duplicates))
-    
-    
+
     def insert_sensor_readings_after(self, sensor_reading_after):
         ''' Tries to insert data from the API in to the database using output from
         scraper.sensor_reading_after() '''
-        
+
         print('\nTrying to insert "sensor_reading_after_data"...')
-    
+
         # Loop through each index (sensor) in sensor_reading_after
         for sensor_dataframe in sensor_reading_after:
-            print('Trying to insert readings from sensor {}...'\
+            print('Trying to insert readings from sensor {}...'
                   .format(sensor_dataframe['sensornumber'].loc[1]))
             # For checking whether there is already a reading with same time index
             duplicates = 0
 
-            for sensor_number, row in sensor_dataframe.iterrows():  
-                #%% continue if already a sensor reading in database with same time index
+            for sensor_number, row in sensor_dataframe.iterrows():
+                # %% continue if already a sensor reading in database with same time index
                 if self.check_for_duplicates(row) == 1:
-                   duplicates +=1
-                   continue
+                    duplicates += 1
+                    continue
 
                 self.insert_row(row)
 
             print('{} duplicate readings sensor readings not inserted for sensor {}.'
-                  .format(duplicates,row['sensornumber']))
-
-
+                  .format(duplicates, row['sensornumber']))
 
     def find_earliest_time(self):
         '''' Checks earliest reading for each sensor by calling scraper.sensor_reading_after() 
         with an input time before the sensors were installed. The first point returned 
         for each sensor will therefore be the earliest reading.'''
-    
+
         sensor_reading_after_data, _ = \
-            self.smart_building.sensor_reading_after(timestamp_epoch_millisec=1546300800000)
-        
+            self.smart_building.sensor_reading_after(
+                timestamp_epoch_millisec=1546300800000)
+
         earliest_time_list = []
         for i in sensor_reading_after_data:
             earliest_time_list.append(i['timestampms'][1])
         earliest_time = min(earliest_time_list)
-    
+
         return(earliest_time, sensor_reading_after_data)
-    
-    
+
     def populate_database(self):
         ''' Calls API and returns readings from the earliest process, then in steps 
         of 1000 minutes until the current time. Note: runs based on earliest from 
         API, not from what exists in database.'''
-        
+
         # check when to start collecting data from
         earliest_time, sensor_reading_after_data = self.find_earliest_time()
-    
+
         # put current time into variable
         time_now = Scraper._time_now()
-        
+
         # insert the first time
         self.insert_sensor_readings_after(sensor_reading_after_data)
-    
+
         # in steps of 1000 minutes, call API to retrieve data and insert into database.
         # Note: typical interval between sensor reading is 1 minute, API call returns max 1000 rows.
         for input_time in range(earliest_time, time_now, 60000000):
             sensor_reading_after_data, all_sensor_numbers = \
-                self.smart_building.sensor_reading_after(timestamp_epoch_millisec=input_time)
+                self.smart_building.sensor_reading_after(
+                    timestamp_epoch_millisec=input_time)
             self.insert_sensor_readings_after(sensor_reading_after_data)
-
 
     def populate_from(self, time_from):
         ''' Populates database with calls API from 'time_from' until now. time_now
         is an integer ms time epoch. API calls are made in steps of 1000 minutes. '''
-    
+
         # get current time
         time_now = Scraper._time_now()
 
@@ -197,7 +190,8 @@ class Database():
         # Note: typical interval between sensor reading is 1 minute, API call returns max 1000 rows.
         for input_time in range(time_from, time_now, 60000000):
             sensor_reading_after_data, all_sensor_numbers = \
-                database.smart_building.sensor_reading_after(timestamp_epoch_millisec=input_time)
+                database.smart_building.sensor_reading_after(
+                    timestamp_epoch_millisec=input_time)
             self.insert_sensor_readings_after(sensor_reading_after_data)
 
     def __del__(self):
@@ -207,10 +201,7 @@ class Database():
         self.conn.close()
 
 
-
-
-
-#%% Program starts here
+# %% Program starts here
 if __name__ == '__main__':
 
     # Parse command line arguments. Currently three options (must choose one):
@@ -220,15 +211,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # The 'group' means that only one argument can be called. One of these is required
-    group = parser.add_mutually_exclusive_group(required = True)
+    group = parser.add_mutually_exclusive_group(required=True)
 
     # Get latest data, will store parser.recent=True to incidate that this parameter has ben set
     group.add_argument('-r', '--recent', dest='recent', action='store_true',
-                       help="Get the most recent data from the API" )
+                       help="Get the most recent data from the API")
 
     # Get all available data
     group.add_argument('-a', '--all', dest='all', action='store_true',
-                           help="Get all available data from the API")
+                       help="Get all available data from the API")
 
     # Get data from a time point. This needs an additional argument: time to get from
     group.add_argument('-f', '--from', dest='_from', nargs=1, type=int,
@@ -247,7 +238,7 @@ if __name__ == '__main__':
 
         elif args.all:
             print("Getting all data from the api")
-            database.populate_database();
+            database.populate_database()
 
         elif args._from:
             time_from = args._from[0]
@@ -255,7 +246,8 @@ if __name__ == '__main__':
             database.populate_from(time_from)
 
         else:
-            raise Exception("No arguments provided! Should not have gotten here.")
+            raise Exception(
+                "No arguments provided! Should not have gotten here.")
 
         # # get 1000 rows of data after a certain time for each sensor. Put in database
         # # 1584835200000 = Sun Mar 22 2020 00:00:00
