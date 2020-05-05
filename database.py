@@ -1,5 +1,16 @@
 """
-Code to create, add to and retrieve from an sqlite database
+database.py
+
+This code adds to and retrieve from an sqlite database. To run this code, a 
+file named database.db must exist. This can be created 
+with sqlite3 and create_datbase.sql.
+
+To do this, run the following on the command line:
+    
+    sqlite3 TARGET_DIRECTORY\database.db < TARGET_DIRECTORY\create_database.sql
+
+Replace TARGET_DIRECTORY with the directory containing 'create_database.sql'.
+   
 It requires the packages:
   - 'pyodbc' which contains general functions for connecting to databases
   - 'sqlite' which has sqlite drivers specifically (SQLite is the database 
@@ -7,10 +18,6 @@ It requires the packages:
 
 Good docs for sqlite access in python here: 
 https://docs.python.org/3/library/sqlite3.html
-
-If you've not done so already you need to create the database first - e.g. by
-running the following on the command line:
-   sqlite3 database.db < create_database.sql
 
 """
 

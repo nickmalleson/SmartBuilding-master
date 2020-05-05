@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 """
+databaseplot.py
+
+This script is for plotting from the SQL database file named 'database.db'. 
+This happens by running methods of the DatabasePlotter() class.
+
 Created on Thu Mar 12 18:04:38 2020
 
 @author: medtcri
@@ -16,7 +21,8 @@ register_matplotlib_converters()
 
 
 class DatabasePlotter():
-    """Obtains login details and stores data associated with the account as
+    """Tool for plotting from the SQL database file named 'database.db'. 
+    Obtains login details and stores data associated with the account as
     class attributes. Also includes the parameters for how the plot is 
     created.
     """
