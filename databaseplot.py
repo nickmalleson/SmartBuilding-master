@@ -4,38 +4,43 @@ Created on Thu Mar 12 18:04:38 2020
 
 @author: medtcri
 """
-import sqlite3
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import pandas as pd
 import datetime as dt
-from scraper import Scraper
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
 from pandas.plotting import register_matplotlib_converters
-
+import pandas as pd
+from scraper import Scraper
+import sqlite3
+import sys
 register_matplotlib_converters()
 
 
-class DatabasePlotter(object):
-    """Obtains login details and stores data associated with the account in 
-    constant variables.
+class DatabasePlotter():
+    """Obtains login details and stores data associated with the account as
+    class attributes. Also includes the parameters for how the plot is 
+    created.
     """
 
     def __init__(self):
 
+        # connect to database
         self.conn, self.c = self.connect_to_database()
-
+        
+        # get sensor info
         self.sensor_location_info = \
             self.get_table_info('sensors', 'sensor_number')
-        self.sensor_numbers = self.sensor_location_info.index.tolist()
-        self.sensor_names = \
+        self.all_sensor_numbers = self.sensor_location_info.index.tolist()
+        self.all_sensor_names = \
             self.sensor_location_info['sensor_name'].tolist()
         print("Sensor locations retrieved successfully.")
 
+        # get room info
         self.room_info = self.get_table_info('rooms', 'room_number')
-        self.room_numbers = self.room_info.index.tolist()
-        self.room_names = self.room_info['room_name'].tolist()
+        self.all_room_numbers = self.room_info.index.tolist()
+        self.all_room_names = self.room_info['room_name'].tolist()
         print("Room information retrieved successfully.")
 
+        # lists of plot parameters and plot labels
         self.param_list = ['occupancy', 'voc', 'co2', 'temperature',
                            'pressure', 'humidity', 'lux', 'noise']
 
@@ -51,6 +56,18 @@ class DatabasePlotter(object):
                                        'Humidity\n(RH, mean)', 
                                        'Light Intensity\n(lux, mean)',
                                        'Noise Levels\n(dB, mean)']
+
+        # plotting parameters
+        self.sensor_numbers = None
+        self.sensor_names = None
+        self.room_numbers = None
+        self.room_names = None
+        self.time_from = None
+        self.time_to = None
+        self.parameters = None
+        self.overlay = None
+        self.aggregate = None
+        self.seperate = None
 
     def connect_to_database(self):
         # connect to database
@@ -143,7 +160,8 @@ class DatabasePlotter(object):
                       parameters=None):
         ''' Retrieve data from the database based on sensor number and 
         timeframe using pd.read_sql.
-        https://stackoverflow.com/questions/24408557/pandas-read-sql-with-parameters/24418294 
+        https://stackoverflow.com/questions/24408557/pandas-read-sql-with-
+        parameters/24418294 
 
         Parameters
         ----------
@@ -161,12 +179,6 @@ class DatabasePlotter(object):
         Dataframe of data to plot.
 
         '''
-
-        # use defaults for unset parameters
-        sensor_numbers, _, _, _, time_from, time_to, parameters, _, _, _ = \
-            self.set_defaults(sensor_numbers=sensor_numbers, 
-                              time_from=time_from, time_to=time_to, 
-                              parameters=parameters)
 
         # build string for paramteres to input into pd.read_sql
         if isinstance(parameters, list):
@@ -199,15 +211,18 @@ class DatabasePlotter(object):
 
         # error message if no data returned
         if data_to_plot.empty:
-            sensor_numbers, sensor_names, room_number, room_name = \
+            sensor_numbers, sensor_names, room_numbers, room_names = \
                 self.get_names_and_numbers(sensors=sensor_numbers)
-            if isinstance(sensor_numbers, list):
-                sensor_numbers_str = str(', '.join(str(x)
-                                                   for x in sensor_numbers))
-            else:
-                sensor_numbers_str = sensor_numbers
-            print('No data for the following sensor(s) from room {}, {}: {}.'
-                  .format(room_number[0], room_name[0], sensor_numbers_str))
+
+            sensor_numbers_str = str(', '.join(str(x) 
+                                               for x in sensor_numbers))
+            
+            room_names_str = str(', '.join(str(x) for x in room_names))
+
+            print('No data from one of the following:\n    Room name(s): {}. '
+                  '\n    Sensor number(s): {}.'.format(room_names_str, 
+                                                       sensor_numbers_str))
+
         return (data_to_plot)
 
     def plot_setup(self, data_to_plot, aggregate=0):
@@ -240,7 +255,7 @@ class DatabasePlotter(object):
             # generate plot title
             if len(room_numbers) == 1:
                 total_sensors_in_room = len(self.sensors_in_room(
-                    self.sensor_numbers, room_names[0]))
+                    self.all_sensor_numbers, room_names[0]))
                 plot_title = str('Data from {}/{} sensors in {}'
                                  .format(len(sensor_numbers), 
                                          total_sensors_in_room, 
@@ -249,7 +264,7 @@ class DatabasePlotter(object):
                 total_num_sensors = 0
                 for room_name in room_names:
                     total_num_sensors += len(self.sensors_in_room(
-                        self.sensor_numbers, room_name))
+                        self.all_sensor_numbers, room_name))
 
                 plot_title = str('Data from {}/{} sensors in {} rooms'
                                  .format(len(sensor_numbers), 
@@ -261,15 +276,27 @@ class DatabasePlotter(object):
 
         elif aggregate == 1:
 
-            # get room numbers and from dataframe
-            room_numbers = data_to_plot['room_number'].unique().tolist()
+            # get room names
+            room_names = \
+                data_to_plot['room_name'].unique().tolist()
 
-            # get sensor_numbers and sensor names from dataframe
-            sensor_numbers = data_to_plot['sensor_number'].unique().tolist()
+            # sensor numbers are converted to strings in aggregated dfs
+            # so gets sensor_numbers AS STRINGS
+            # this is used later for plotting so must be same length as when
+            # it comes in
+            sensor_numbers = \
+                data_to_plot['sensor_number'].unique().tolist()
 
-            # get the reset of the details
-            all_sensor_numbers, sensor_names, room_numbers, room_names = \
-                self.get_names_and_numbers(rooms=room_numbers)
+            # get sensor numbers as list of ints
+            sensor_numbers_ints = []
+            for sensor_string in sensor_numbers:
+                for i in sensor_string.split(', '):
+                    sensor_numbers_ints.append(i)
+            sensor_numbers_ints = list(map(int, sensor_numbers_ints))
+
+            # then get the the reset of the details from this
+            sensor_numbers_ints, sensor_names, room_numbers, room_names = \
+                self.get_names_and_numbers(sensors=sensor_numbers_ints)
 
             # set plot labels
             all_plot_labels = self.plot_labels_aggregated
@@ -281,24 +308,24 @@ class DatabasePlotter(object):
             # generate plot title and legend series
             if len(room_numbers) == 1:
                 total_sensors_in_room = len(self.sensors_in_room(
-                    self.sensor_numbers, room_names[0]))
+                    self.all_sensor_numbers, room_names[0]))
                 plot_title = str('Aggregated data from {}/{} sensors in {}'
-                                 .format(len(all_sensor_numbers), 
+                                 .format(len(sensor_numbers_ints), 
                                          total_sensors_in_room, 
                                          room_names[0]))
-                legend_series = list(
-                    str('Room number {}:\n        {}'.format(room_numbers[0], 
-                                                             room_names[0])))
+                legend_series = [str('Room number {}:\n        {}'
+                                     .format(room_numbers[0], room_names[0]))]
 
             else:
                 total_in_all_rooms = 0
                 legend_series = []
 
-                for room_number, room_name in zip(room_numbers, room_names):
+                for room_number, room_name in zip(self.room_numbers,
+                                                  self.room_names):
                     total_in_room = len(self.sensors_in_room(
-                        self.sensor_numbers, room_name))
+                        self.all_sensor_numbers, room_name))
                     included_from_room = len(
-                        self.sensors_in_room(all_sensor_numbers, room_name))
+                        self.sensors_in_room(sensor_numbers_ints, room_name))
                     total_in_all_rooms += total_in_room
                     legend_str = str(
                         'Room number {}:\n        {} (n={}/{})'
@@ -307,7 +334,7 @@ class DatabasePlotter(object):
                     legend_series.append(legend_str)
 
                 plot_title = str('Aggregated data from {}/{} sensors in {} '
-                                 'rooms'.format(len(all_sensor_numbers), 
+                                 'rooms'.format(len(sensor_numbers_ints), 
                                                 total_in_all_rooms, 
                                                 len(room_numbers)))
 
@@ -492,13 +519,14 @@ class DatabasePlotter(object):
         mean_per_minute_total = mean_per_minute_per_sensor.groupby(
             ['timestampms']).mean()
 
-        # Get sum of occupcany
-        occupancy_sum = mean_per_minute_per_sensor.groupby(
-            ['timestampms']).sum()
-
-        # get data for output and replace mean occupancy with sum
+        # collect data for output 
         aggregated_data = mean_per_minute_total
-        aggregated_data['occupancy'] = occupancy_sum['occupancy']
+
+        # if it exists, get sum of occupancy and replace the mean with it
+        if 'occupancy' in aggregated_data.columns:            
+            occupancy_sum = mean_per_minute_per_sensor.groupby(
+                ['timestampms']).sum()
+            aggregated_data['occupancy'] = occupancy_sum['occupancy']
 
         # set the index to timestampms
         aggregated_data['timestampms'] = aggregated_data.index
@@ -516,13 +544,11 @@ class DatabasePlotter(object):
 
         return (aggregated_data)
 
-    def set_defaults(self, sensor_numbers=None, sensor_names=None, 
-                     room_numbers=None, room_names=None, time_from=None, 
-                     time_to=None, parameters=None, overlay=None, 
-                     aggregate=None, seperate=None):
+    def set_defaults(self):
         '''
-        Takes parameters as input and returns those not already set to 
-        default.    
+        Sets plotting parameters of DatabasePlotter() class. Sets only those
+        set to None to default. Takes no input but checks and changes the 
+        parameters of the class.
 
         Parameters
         ----------
@@ -560,44 +586,46 @@ class DatabasePlotter(object):
 
         Returns
         -------
-        Parameters with unset parameters set to default.
+        No returns - sets plot parmaters as attributes of DatabasePlotter() 
+        class.
 
         '''
 
-        sensor_numbers, sensor_names, room_number, room_name = \
-            self.get_names_and_numbers(sensors=sensor_numbers)
+        # get sensor numbers and names. Only requires uses sensors number
+        # as if there is input, others are there from early in
+        # plot_from_database()
+        self.sensor_numbers, self.sensor_names, self.room_numbers, \
+            self.room_names = \
+                self.get_names_and_numbers(sensors=self.sensor_numbers)
 
-        if sensor_numbers == None:
-            sensor_numbers = self.sensor_numbers
-        if sensor_names == None:
-            sensor_names = self.sensor_names
-        if room_numbers == None:
-            room_numbers = self.room_numbers
-        if room_names == None:
-            room_names = self.room_names
-        if time_from == None:
+        if self.sensor_numbers == None:
+            self.sensor_numbers = self.all_sensor_numbers
+        if self.sensor_names == None:
+            self.sensor_names = self.all_sensor_names
+        if self.room_numbers == None:
+            self.room_numbers = self.all_room_numbers
+        if self.room_names == None:
+            self.room_names = self.all_room_names
+        if self.time_from == None:
             # time_from = Scraper._time_now() - 86400000 # previous 24 hours
             # time_from = Scraper._time_now() - 604800000 # previous week
-            time_from = 1580920305102  # from first sensor reading
-        if time_to == None:
-            time_to = Scraper._time_now()
-        if parameters == None:
-            parameters = self.param_list
-        if overlay == None and len(sensor_numbers) > 1:
-            overlay = 1
-        elif overlay == None:
-            overlay = 0
-        if aggregate == None:
-            aggregate = 0
-        if seperate == None:
-            seperate = 1
+            self.time_from = 1580920305102  # from first sensor reading
+        if self.time_to == None:
+            self.time_to = Scraper._time_now()
+        if self.parameters == None:
+            self.parameters = self.param_list
+        if self.overlay == None and len(self.sensor_numbers) > 1:
+            self.overlay = 1
+        elif self.overlay == None:
+            self.overlay = 0
+        if self.aggregate == None:
+            self.aggregate = 0
+        if self.seperate == None:
+            self.seperate = 1
 
-        return (sensor_numbers, sensor_names, room_numbers, room_names, 
-                time_from, time_to, parameters, overlay, aggregate, seperate)
+        return 
 
-    def choose_from_command_line(self, input_choice, sensors=None, rooms=None,
-                                 time_from=None, time_to=None, parameters=None,
-                                 overlay=None, aggregate=None, seperate=None):
+    def choose_from_command_line(self, input_choice):
         '''
         Takes user input to generate plot from command line. Minimum 
         requirement is entering either 'sensors' or 'rooms' to choose from. 
@@ -607,7 +635,9 @@ class DatabasePlotter(object):
         Parameters
         ----------
         input_choice : STR
-            Enter either 'sensors' or 'rooms'. Prompts will adjust accordingly.
+            Enter 'sensors', 'rooms', or 'parameters'. Prompts will adjust 
+            accordingly. For parameters, sensors or rooms inputs must be set
+            for plot_from_database()
         sensors : single/LIST of INT or STR, optional
             If ints: [1, 2, 3] 
             If str: ['0-Café-1', '0-Café-2', '0-Cafe-3']
@@ -629,35 +659,33 @@ class DatabasePlotter(object):
         '''
 
         # %% establish sensor and room numbers and names
-        if sensors == None and rooms == None:
+        if self.sensor_numbers == None and self.room_numbers == None:
             if input_choice == 'rooms':
-                room_numbers, room_names = Scraper._choose_by_number(
-                    self.room_info, 'room_name')
-                sensor_numbers, sensor_names, room_numbers, room_names = \
-                    self.get_names_and_numbers(rooms=room_numbers)
+                self.room_numbers, self.room_names = \
+                    Scraper._choose_by_number(self.room_info, 'room_name')
             elif input_choice == 'sensors':
-                sensor_numbers, sensor_names = Scraper._choose_by_number(
-                    self.sensor_location_info, 'sensor_name')
-                sensor_numbers, sensor_names, room_numbers, room_names = \
-                    self.get_names_and_numbers(sensors=sensor_numbers)
+                self.sensor_numbers, self.sensor_names = \
+                    Scraper._choose_by_number(self.sensor_location_info, 
+                                              'sensor_name')
+            elif input_choice == 'parameters':
+                print("Using all sensors.")
+                self.sensor_numbers = self.all_sensor_numbers
             else:
-                print(
-                    "Unknown input for variable 1: input_choice. Enter 'rooms'"
-                    " or 'sensors', including quotes.")
+                print("Unknown input for variable 1: input_choice. Enter "
+                      "'rooms' or 'sensors', including quotes.")
                 return
-        elif sensors:
-            sensor_numbers, sensor_names, room_numbers, room_names = \
-                self.get_names_and_numbers(sensors=sensors)
-        elif rooms:
-            sensor_numbers, sensor_names, room_numbers, room_names = \
-                self.get_names_and_numbers(rooms=rooms)
 
-            # %% find which variables are still empty and query whether 
-            # user wants to use defaults
-        input_list = [time_from, time_to,
-                      parameters, overlay, aggregate, seperate]
-        input_str_list = ['time_from', 'time_to',
-                          'parameters', 'overlay', 'aggregate', 'seperate']
+        self.sensor_numbers, self.sensor_names, self.room_numbers, \
+            self.room_names = \
+                self.get_names_and_numbers(sensors=self.sensor_numbers,
+                                               rooms=self.room_numbers)
+
+        # %% find which variables are still empty and query whether 
+        # user wants to use defaults
+        input_list = [self.time_from, self.time_to, self.parameters, 
+                      self.overlay, self.aggregate, self.seperate]
+        input_str_list = ['time_from', 'time_to', 'parameters', 
+                          'overlay', 'aggregate', 'seperate']
         default_settings = ['first available', 'most recent', 'all', 
                             'overlay', 'do not aggregate', 
                             'rooms on different plots']
@@ -674,66 +702,73 @@ class DatabasePlotter(object):
         default_str = str(', '.join(default_str))
 
         use_default = input('No preference specified for: {}. \n'
-                            'Default: {}. Use default settings? \n[y/n]: '
+                            'Default: {}. \nUse default settings? \n[y/n]: '
                             .format(empty_input_str, default_str))
 
         # %% use defaults or provide further choice based on user input
         if (not use_default) or (use_default == 'y'):
             print("Using defaults.")
-            sensor_numbers, sensor_names, room_numbers, room_names, \
-                time_from, time_to, parameters, overlay, aggregate, \
-                    seperate = \
-                self.set_defaults(sensor_numbers, sensor_names, room_numbers, 
-                                  room_names, time_from, time_to, parameters, 
-                                  overlay, aggregate, seperate)
+            self.set_defaults()
         else:
-            if (time_from == None) and (time_to == None):
-                time_from, time_to = DatabasePlotter._choose_time()
-            elif time_from == None and time_to:
-                time_from = input(
-                    'Input start time to plot in ms epochs in format: \n')
-                time_from = eval(time_from)
-            elif time_from and time_to == None:
-                time_to = input(
-                    'Input end time to plot in ms epochs in format: \n')
-                time_to = eval(time_to)
-            if parameters == None:
-                _, parameters = Scraper._choose_by_number(
+            if (self.time_from == None) and (self.time_to == None):
+                self.time_from, self.time_to = DatabasePlotter._choose_time()
+            elif self.time_from == None and self.time_to:
+                self.time_from = input(
+                    'Input start time to plot in ms epochs in format (enter '
+                    '= use default): \n')
+                if len(self.time_from) > 0:
+                    self.time_from = eval(self.time_from)
+                else:
+                    self.time_from = None
+            elif self.time_from and self.time_to == None:
+                self.time_to = input(
+                    'Input end time to plot in ms epochs in format (enter = '
+                    'use default): \n')
+                if len(self.time_to) > 0:
+                    self.time_to = eval(self.time_to)
+                else:
+                    self.time_to = None
+            if self.parameters == None:
+                _, self.parameters = Scraper._choose_by_number(
                     self.param_list, 'parameter')
-            if overlay == None and len(sensor_numbers) > 1:
-                overlay = input('Overlay plots on same graph? \n[y/n]: ')
-                if (not overlay) or (overlay == 'y'):
-                    overlay = 1
-                elif overlay == 'n':
-                    overlay = 0
+            if self.overlay == None and len(self.sensor_numbers) > 1:
+                self.overlay = input('Overlay plots on same graph? \n[y/n]: ')
+                if (not self.overlay) or (self.overlay == 'y'):
+                    self.overlay = 1
+                elif self.overlay == 'n':
+                    self.overlay = 0
                 else:
                     print('Unknown input.')
-            elif overlay == None:
-                overlay = 0
-            if aggregate == None and len(sensor_numbers) > len(room_numbers):
-                aggregate = input(
+            elif self.overlay == None:
+                self.overlay = 0
+            if self.aggregate == None and len(self.sensor_numbers) > \
+                len(self.room_numbers):
+                self.aggregate = input(
                     'Aggregate sensors from same room? \n[y/n]: ')
-                if (not aggregate) or (aggregate == 'y'):
-                    aggregate = 1
-                elif aggregate == 'n':
-                    aggregate = 0
+                if (not self.aggregate) or (self.aggregate == 'y'):
+                    self.aggregate = 1
+                elif self.aggregate == 'n':
+                    self.aggregate = 0
                 else:
                     print('Unknown input.')
-            elif aggregate == None:
-                aggregate = 0
-            if seperate == None and aggregate == 0 and overlay == 1:
-                seperate = input(
+            elif self.aggregate == None:
+                self.aggregate = 0
+            if self.seperate == None and self.aggregate == 0 and \
+                self.overlay == 1 and len(self.room_numbers) >1:
+                self.seperate = input(
                     'Plot sensors from different rooms on seperate plots? '
                     '\n[y/n]: ')
-                if (not seperate) or (seperate == 'y'):
-                    seperate = 1
-                elif seperate == 'n':
-                    seperate = 0
+                if (not self.seperate) or (self.seperate == 'y'):
+                    self.seperate = 1
+                elif self.seperate == 'n':
+                    self.seperate = 0
                 else:
                     print('Unknown input.')
+            
+            # for any that the user skipped
+            self.set_defaults()
 
-        return (sensor_numbers, sensor_names, room_numbers, room_names, 
-                time_from, time_to, parameters, overlay, aggregate, seperate)
+        return 
 
     def get_names_and_numbers(self, sensors=None, rooms=None):
         '''Input a list of one the following: sensor numbers, sensor names, 
@@ -759,12 +794,13 @@ class DatabasePlotter(object):
         sensor_info = self.sensor_location_info
         room_info = self.room_info
 
+        # put into a list if not already so function can deal with it
         if isinstance(sensors, int) or isinstance(sensors, str):
             sensors = [sensors]
         if isinstance(rooms, int) or isinstance(rooms, str):
             rooms = [rooms]
 
-        if sensors:
+        if sensors != None:
             # if sensor numbers, define sensor names and numbers
             if isinstance(sensors[0], int):
                 sensor_numbers = sensor_info.loc[sensors].sort_index(
@@ -789,7 +825,7 @@ class DatabasePlotter(object):
             # get corresponding numbers
             room_numbers = room_info.loc[room_info['room_name'].isin(
                 room_names)].index.tolist()
-        elif rooms:
+        elif rooms != None:
             # if room numbers, define room names and numbers
             if isinstance(rooms[0], int):
                 room_numbers = room_info.loc[rooms].sort_index(
@@ -809,25 +845,33 @@ class DatabasePlotter(object):
             sensor_names = \
                 sensor_info['sensor_name'].loc[sensor_numbers].unique(
                     ).tolist()
-        else:
+        elif sensors == None and rooms == None:
             sensor_numbers = None
             sensor_names = None
             room_numbers = None
             room_names = None
+            return (sensor_numbers, sensor_names, room_numbers, room_names)
+
+        # this means it has failed
+        if len(sensor_numbers) + len(room_names) < 2:
+            sys.exit("Sensor/room input not recongised. Check inputs - e.g. "
+                     "plot_from_database('rooms'=['0-Café', "
+                     "'0-Exhibition-Area'])")
 
         return (sensor_numbers, sensor_names, room_numbers, room_names)
 
     def plot_from_database(self, choose_by_input=None, sensors=None, 
-                           rooms=None, time_from=None, time_to=None, 
-                           parameters=None, overlay=None, aggregate=None, 
+                           rooms=None, time_from=None, 
+                           time_to=None, parameters=None, 
+                           overlay=None, aggregate=None, 
                            seperate=None):
         '''
-        Evaluates inputs to plot from from database. Determines whether user 
+        Evaluates inputs to plot from database. Determines whether user 
         to take user input to from command line, and if not, plots using the 
         parameters set in the input with all others set to default. With no 
         inputs, all are set to default. To choose from command line, minimum 
         required input is 'sensors' or 'rooms'. Other parameters are can be 
-        set and they will not be promopted for in command line.
+        set and they will not be prompted for in command line.
 
         Parameters
         ----------
@@ -852,37 +896,40 @@ class DatabasePlotter(object):
         None
         '''
         # %% first, establish the parameters for plotting
+        
+        # update the class parameters to plot based on input
+        self.time_from = time_from
+        self.time_to = time_to 
+        self.parameters = parameters
+        self.overlay = overlay
+        self.aggregate = aggregate
+        self.seperate = seperate
 
         # retrieve room and sensor names and numbers from the list of ints 
         # or str input in sensors or rooms
-        sensor_numbers, sensor_names, room_numbers, room_names = \
-            self.get_names_and_numbers(sensors, rooms)
+        self.sensor_numbers, self.sensor_names, self.room_numbers, \
+            self.room_names = self.get_names_and_numbers(sensors=sensors,
+                                                         rooms=rooms)
 
-        # check if user wants to choose from command line and collect info 
-        # this way if they do
+        # choose from command line depending on user choice
         if choose_by_input != None:
-            sensor_numbers, sensor_names, room_numbers, room_names, \
-                time_from, time_to, parameters, overlay, aggregate, \
-                    seperate = \
-                self.choose_from_command_line(choose_by_input, sensors, 
-                                              rooms, time_from, time_to, 
-                                              parameters, overlay, aggregate, 
-                                              seperate)
+            self.choose_from_command_line(choose_by_input)
         else:  # set the unset variables to default
-            sensor_numbers, sensor_names, room_numbers, room_names, \
-            time_from, time_to, parameters, overlay, aggregate, seperate = \
-                self.set_defaults(sensor_numbers, sensor_names, room_numbers, 
-                                  room_names, time_from, time_to, parameters, 
-                                  overlay, aggregate, seperate)
+            if self.sensor_numbers == None:        
+                print('No sensors or rooms entered, setting to default '
+                      '(all).')
+            self.set_defaults()
 
         # %% aggregate = 0 overlay = 0
-        if aggregate == 0 and overlay == 0:
-            for sensor_number, sensor_name in zip(sensor_numbers, 
-                                                  sensor_names):
-                data_to_plot = self.retrieve_data(
-                    sensor_number, time_from, time_to, parameters)
+        if self.aggregate == 0 and self.overlay == 0:
+            for sensor_number, sensor_name in zip(self.sensor_numbers, 
+                                                  self.sensor_names):
+                data_to_plot = self.retrieve_data(sensor_number, 
+                                                  self.time_from, 
+                                                  self.time_to, 
+                                                  self.parameters)
                 if not data_to_plot.empty:
-                    print('Plotting data from sensor {}: {}.'.format(
+                    print('Plotting data from sensor {}: {}...'.format(
                         sensor_number, sensor_name))
                     self.plot_from_dataframe(data_to_plot)
                 else:
@@ -890,49 +937,57 @@ class DatabasePlotter(object):
             return
 
         # %% aggregate = 0 overlay = 1
-        elif aggregate == 0 and overlay == 1:
-            if seperate == 1:
-                for room_number, room_name in zip(room_numbers, room_names):
+        elif self.aggregate == 0 and self.overlay == 1:
+            if self.seperate == 1:
+                for room_number, room_name in zip(self.room_numbers, 
+                                                  self.room_names):
                     sensors_in_current_room = self.sensors_in_room(
-                        sensor_numbers, room_name)
+                        self.sensor_numbers, room_name)
                     data_to_plot = self.retrieve_data(sensors_in_current_room, 
-                                                      time_from, time_to, 
-                                                      parameters)
+                                                      self.time_from, 
+                                                      self.time_to, 
+                                                      self.parameters)
                     if not data_to_plot.empty:
                         print('Plotting overlaid data from {} sensors from '
-                              'room {}: {}.'
+                              'room {}: {}...'
                              .format(len(sensors_in_current_room), 
                                      room_number, room_name))
                         self.plot_from_dataframe(data_to_plot)
                     else:
-                        return
+                        continue
             else:
-                data_to_plot = self.retrieve_data(
-                    sensor_numbers, time_from, time_to, parameters)
+                data_to_plot = self.retrieve_data(self.sensor_numbers, 
+                                                  self.time_from, 
+                                                  self.time_to, 
+                                                  self.parameters)
                 if not data_to_plot.empty:
                     print('Plotting overlaid data from {} sensors from {} '
-                          'room(s).'
-                          .format(len(sensor_numbers), len(room_numbers)))
+                          'room(s)...'
+                          .format(len(self.sensor_numbers), 
+                                  len(self.room_numbers)))
                     self.plot_from_dataframe(data_to_plot)
                     return
                 else:
                     return
 
         # %% aggregate = 1 overlay = 0
-        elif aggregate == 1 and overlay == 0:
-            for room_number, room_name in zip(room_numbers, room_names):
+        elif self.aggregate == 1 and self.overlay == 0:
+            for room_number, room_name in zip(self.room_numbers, 
+                                              self.room_names):
                 sensors_in_current_room = self.sensors_in_room(
-                    sensor_numbers, room_name)
-                data_to_plot = self.retrieve_data(
-                    sensors_in_current_room, time_from, time_to, parameters)
+                    self.sensor_numbers, room_name)
+                data_to_plot = self.retrieve_data(sensors_in_current_room, 
+                                                  self.time_from, 
+                                                  self.time_to, 
+                                                  self.parameters)
                 if not data_to_plot.empty:
                     print('Aggregating data for {} sensors in room {}: {}...'
                           .format(len(sensors_in_current_room), room_number, 
                                   room_name))
                     aggregated_data = self.aggregate_data(
-                        data_to_plot, parameters)
+                        data_to_plot, self.parameters)
                     print('Plotting aggregated data from {} sensors from '
-                          'room {}: {}.'
+                          'room {}: {}...'
                           .format(len(sensors_in_current_room), room_number, 
                                   room_name))
                     self.plot_from_dataframe(aggregated_data, aggregate=1)
@@ -941,19 +996,22 @@ class DatabasePlotter(object):
             return
 
         # %% aggregate = 1 overlay = 1
-        elif aggregate == 1 and overlay == 1:
+        elif self.aggregate == 1 and self.overlay == 1:
             aggregated_dfs = pd.DataFrame
-            for room_number, room_name in zip(room_numbers, room_names):
+            for room_number, room_name in zip(self.room_numbers, 
+                                              self.room_names):
                 sensors_in_current_room = self.sensors_in_room(
-                    sensor_numbers, room_name)
-                data_to_plot = self.retrieve_data(
-                    sensors_in_current_room, time_from, time_to, parameters)
+                    self.sensor_numbers, room_name)
+                data_to_plot = self.retrieve_data(sensors_in_current_room, 
+                                                  self.time_from, 
+                                                  self.time_to, 
+                                                  self.parameters)
                 if not data_to_plot.empty:
                     print('Aggregating data for {} sensors in room {}: {}...'
                           .format(len(sensors_in_current_room), room_number, 
                                   room_name))
                     aggregated_data = self.aggregate_data(
-                        data_to_plot, parameters)
+                        data_to_plot, self.parameters)
                     if aggregated_dfs.empty:
                         aggregated_dfs = aggregated_data.copy()
                     else:
@@ -961,9 +1019,9 @@ class DatabasePlotter(object):
                             [aggregated_dfs, aggregated_data], axis=0)
                 else:
                     continue
-            print('Plotting avaialable data from {} sensors from {} rooms, '
-                  'aggregated and overlaid.'
-                  .format(len(sensor_numbers), len(room_numbers)))
+            print('Plotting available data from {} sensors from {} rooms, '
+                  'aggregated and overlaid...'
+                  .format(len(self.sensor_numbers), len(self.room_numbers)))
             self.plot_from_dataframe(aggregated_dfs, aggregate=1)
             return
 
@@ -984,6 +1042,3 @@ class DatabasePlotter(object):
         the connection'''
         print("Closing connection to the database")
         self.conn.close()
-
-
-DatabasePlotter().plot_from_database(rooms='2-Open-Office',time_from=1583020800000, time_to=1583107200000, overlay=1)

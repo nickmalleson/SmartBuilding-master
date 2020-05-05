@@ -2,8 +2,16 @@
 """
 scraper.py
 
-Script for accessing the API of the Connected Places Smart Building using python
-and the "requests" library.
+Script for accessing the API of the Connected Places Smart Building using 
+python and the "requests" library.
+
+IMPORTANT: to log in automatically, place a .txt file named 
+'SmartBuildingParameters.txt' in a folder named 'SmartBuildingParameters' 
+in the same diretory as scraper.py. The file should contain the login details 
+in the following format:
+
+"username = user138
+password = letmein"
 
 Created on Thu Oct 17 16:11:16 2019
 
@@ -29,7 +37,8 @@ class Scraper():
 
     def __init__(self, login=True):
 
-        self.username, self.password, self.building_info = Scraper._login()
+        self.username, self.password, self.building_info = \
+            Scraper._login(login)
 
         self.contract_info = self.get_contract_info()
         print("Contract data retrieved successfully.")
@@ -199,7 +208,7 @@ class Scraper():
             Single number or list of numbers corresponding to managed spaces. 
             Use: 
             'chosen_numbers, chosen_names = \
-                choose_by_number(self.managed_space_info)'
+                _choose_by_number(self.managed_space_info)'
             to get a list of numbers corresponding to space names.
         timestamp_epoch_millisec: int
             A time in ms epoch. Returns data from this time and includes up to 
@@ -237,16 +246,14 @@ class Scraper():
         ''' Default time is 1100 minutes from when call was made. This is 
         usually enough to get 1000 data points for each sensor. '''
         if timestamp_epoch_millisec is None:
-            # TODO: UNCOMMENT NEXT LINE, DELETE LINE BELOW
-            # timestamp_epoch_millisec = Scraper._time_now()-66000000
-            timestamp_epoch_millisec = 1583243183
+            timestamp_epoch_millisec = Scraper._time_now()-66000000
 
         # Convert input time to ISO format
         input_time = dt.datetime.utcfromtimestamp(
             int(timestamp_epoch_millisec / 1000)).isoformat()
 
-        print('\nGetting managed space after data.\nMs time epoch used for '
-              'input: {}. Input in ISO format: {}.'
+        print('\nGetting managed space after data from API.\nMs time epoch '
+              'used for input: {}. Input in ISO format: {}.'
               .format(timestamp_epoch_millisec, input_time))
 
         managed_space_after_data = []
@@ -264,7 +271,7 @@ class Scraper():
                 response = self._call_API(function_name)
             except Exception as e:
                 print('Managed space number {}: {}. PROBLEM AQUIRING '
-                      'DATA. Error: {}'.format(space_num, space['name'], 
+                      'DATA. Error: {}'.format(space_num, space['name'],
                                                str(e)))
                 fail += 1
 
@@ -278,7 +285,7 @@ class Scraper():
                 managed_spaces.append(space_num)
                 print('Managed space number {}: {}. Successfully aquired'
                       ' {} rows of data.'
-                      .format(space_num, space['name'], 
+                      .format(space_num, space['name'],
                               len(managed_space_after_data[-1])))
                 succ += 1
         print('Data successfully aquired from {} of {} possible managed '
@@ -309,7 +316,7 @@ class Scraper():
         function_name = "managedspace/latest/building/{}".format(
             self.building_info['id'].loc[building_number])
 
-        print('\nGetting latest managed space data.')
+        print('\nGetting latest managed space data from API.')
 
         # try the API call for the current building, except if fails
         try:
@@ -322,14 +329,14 @@ class Scraper():
             print('Could not acquire latest managed space data from building '
                   'number {}: {}. PROBLEM ACQUIRING DATA. Error: {}'
                   .format(1, self.building_info['name'].loc[building_number],
-                                                              str(e)))
+                          str(e)))
 
         """ Check the ids of the returned managed spaces against all those 
         available and return a list of corresponding indices from 'self'"""
         returned_space_numbers = []
         for space_id in managed_space_latest_data['managedspace']:
             returned_space_numbers.append(int(
-                self.managed_space_info[\
+                self.managed_space_info[
                     self.managed_space_info['id'] == space_id].index.values))
 
         """ add new column in response which corresponds with indices from 
@@ -348,7 +355,7 @@ class Scraper():
 
         print('Latest managed space readings acquired successfully from: {} '
               'of {} possible sensors.'
-              .format(len(returned_space_numbers), 
+              .format(len(returned_space_numbers),
                       len(all_possible_space_numbers)))
 
         return (managed_space_latest_data, returned_space_numbers)
@@ -367,7 +374,7 @@ class Scraper():
             Single number or list of numbers corresponding to sensor location 
             numbers. Use: 
             'chosen_numbers, chosen_names = \
-                choose_by_number(self.sensor_location_info)'
+                _choose_by_number(self.sensor_location_info)'
             to get a list of numbers corresponding to sensor location names.
         timestamp_epoch_millisec: int
             A time in ms epoch. Returns data from this time and includes up to
@@ -406,16 +413,14 @@ class Scraper():
         # Default time is 1100 minutes from when call was made. This is usually
         # enough to get 1000 data points for each sensor.
         if timestamp_epoch_millisec is None:
-            # TODO: UNCOMMENT NEXT LINE, DELETE LINE BELOW
-            # timestamp_epoch_millisec = Scraper._time_now()-66000000
-            timestamp_epoch_millisec = 1583020800000
+            timestamp_epoch_millisec = Scraper._time_now()-66000000
 
         # Convert input time to ISO format
         input_time = dt.datetime.utcfromtimestamp(
             int(timestamp_epoch_millisec / 1000)).isoformat()
 
-        print('\nGetting sensor reading after data.\nMs time epoch used for '
-              'input: {}. Input in ISO format: {}.'
+        print('\nGetting sensor reading after data from API.\nMs time epoch '
+              'used for input: {}. Input in ISO format: {}.'
               .format(timestamp_epoch_millisec, input_time))
 
         sensor_reading_after_data = []
@@ -433,7 +438,7 @@ class Scraper():
                 response = self._call_API(function_name)
             except Exception as e:
                 print("Sensor number {}: {}. PROBLEM AQUIRING "
-                      "DATA. Error: {}".format(sensor_num, sensor['name'], 
+                      "DATA. Error: {}".format(sensor_num, sensor['name'],
                                                str(e)))
                 fail += 1
 
@@ -447,7 +452,7 @@ class Scraper():
                 response = \
                     response.rename(columns={'rxtimestamputc': 'timestamputc',
                                              'rxepochmillisec': 'timestampms',
-                                             'sensorlocationcurrent': 
+                                             'sensorlocationcurrent':
                                                  'sensorlocation'})
                 response['timestamputc'] = response['timestamputc'].apply(
                     parse)
@@ -458,15 +463,15 @@ class Scraper():
 
                 # add 'name' column for room name
                 response['name'] = list(
-                    self.sensor_location_info['name']\
-                        .loc[response['sensornumber']])
+                    self.sensor_location_info['name']
+                    .loc[response['sensornumber']])
 
                 sensor_reading_after_data.append(response)
                 sensor_locations.append(sensor_num)
 
                 print('Sensor number {}: {}. Successfully aquired'
                       ' {} rows of data.'
-                      .format(sensor_num, sensor['name'], 
+                      .format(sensor_num, sensor['name'],
                               len(sensor_reading_after_data[-1])))
                 succ += 1
 
@@ -484,7 +489,7 @@ class Scraper():
 
         Returns
         -------
-        sensor_reading_latest: dataframe containing one row for each 
+        sensor_reading_latest_data: dataframe containing one row for each 
         responsive sensor. The 'sensornumbers' column match indices in 
         'self.sensor_location_info'.
 
@@ -497,51 +502,52 @@ class Scraper():
         function_name = "sensorreading/latest/building/{}".format(
             self.building_info['id'].loc[building_number])
 
-        print('\nGetting latest sensor reading data.')
+        print('\nGetting latest sensor reading data from API.')
 
         # try the API call for the current building, except if fails
         try:
-            ''' the 'sensor_reading_latest' variable will not include 
+            ''' the 'sensor_reading_latest_data' variable will not include 
             non-responsive sensors so will return a list shorter than total 
             number of sensors in self.sensor_location_info'''
-            sensor_reading_latest = self._call_API(function_name)
+            sensor_reading_latest_data = self._call_API(function_name)
             # if the API call fails, state this and move to next
         except Exception as e:
             print('Could not acquire latest sensor reading data from building '
                   'number {}: {}. PROBLEM ACQUIRING DATA. Error: {}'
                   .format(1, self.building_info['name'].loc[building_number],
-                                                              str(e)))
+                          str(e)))
 
         """ Check the ids of the returned sensor locations against all those 
         available and return a list of corresponding indices from 'self'"""
         returned_sensor_numbers = []
-        for sensor_id in sensor_reading_latest['sensorlocation']:
+        for sensor_id in sensor_reading_latest_data['sensorlocation']:
             # TODO: check this is correct:
             returned_sensor_numbers.append(int(
-                self.sensor_location_info[self.sensor_location_info['id'] == \
+                self.sensor_location_info[self.sensor_location_info['id'] ==
                                           sensor_id].index.values))
 
         # Sort timestamp columns to match other functions
-        sensor_reading_latest['timestamputc'] = \
-            sensor_reading_latest['timestamputc'].apply(parse)
-        sensor_reading_latest['timestampms'] = sensor_reading_latest[[
+        sensor_reading_latest_data['timestamputc'] = \
+            sensor_reading_latest_data['timestamputc'].apply(parse)
+        sensor_reading_latest_data['timestampms'] = sensor_reading_latest_data[[
             'timestamputc']].apply(lambda x: x[0].timestamp(), axis=1)\
             .astype('int64') * 1000
 
         """ add new column in response which corresponds with indices from 
         self, sort, and make it the index column"""
-        sensor_reading_latest['sensornumber'] = returned_sensor_numbers
-        sensor_reading_latest = sensor_reading_latest.sort_values(
+        sensor_reading_latest_data['sensornumber'] = returned_sensor_numbers
+        sensor_reading_latest_data = sensor_reading_latest_data.sort_values(
             by=['sensornumber'], inplace=False)
-        sensor_reading_latest = sensor_reading_latest.set_index(
+        sensor_reading_latest_data = sensor_reading_latest_data.set_index(
             ['sensornumber'])
 
         # add 'sensornumber' as a series AS WELL AS the index
-        sensor_reading_latest['sensornumber'] = sensor_reading_latest.index
+        sensor_reading_latest_data['sensornumber'] = \
+            sensor_reading_latest_data.index
 
         # add 'name' column for room name
-        sensor_reading_latest['name'] = self.sensor_location_info['name']\
-            .loc[sensor_reading_latest['sensornumber']]
+        sensor_reading_latest_data['name'] = self.sensor_location_info['name']\
+            .loc[sensor_reading_latest_data['sensornumber']]
 
         # Check for missing spaces and print names and numbers if one is found
         for i in all_possible_sensor_numbers:
@@ -550,10 +556,10 @@ class Scraper():
                       .format(i, self.sensor_location_info['name'].loc[i]))
 
         print('Latest sensor readings acquired successfully from: {} of {} '
-              'possible sensors.' .format(len(returned_sensor_numbers), 
+              'possible sensors.' .format(len(returned_sensor_numbers),
                                           len(all_possible_sensor_numbers)))
 
-        return (sensor_reading_latest, returned_sensor_numbers)
+        return (sensor_reading_latest_data, returned_sensor_numbers)
 
     def plot_managed_spaces(self, managed_spaces=None,
                             managed_space_after_data=None):
@@ -566,7 +572,7 @@ class Scraper():
         managed_spaces: int/list of ints
             Single number or list. Use:
             'chosen_numbers, chosen_names = \
-                choose_by_number(self.managed_space_info)'
+                _choose_by_number(self.managed_space_info)'
             to get corresponding numbers.
 
         managed_space_after_data: list of dataframes.
@@ -599,8 +605,8 @@ class Scraper():
                                       managed_spaces):
             if not any(data):
                 print('Managed space number {}: {}. NO DATA RETURNED'.format(
-                    space_number, self.managed_space_info['name']\
-                        .loc[space_number]))
+                    space_number, self.managed_space_info['name']
+                    .loc[space_number]))
                 continue
             else:
                 legend_labels.append(
@@ -608,7 +614,7 @@ class Scraper():
                 print('Managed space number {}: {}. Data Available. '
                       'Plotting chart.'
                       .format(space_number,
-                              self.managed_space_info['name']\
+                              self.managed_space_info['name']
                                   .loc[space_number]))
 
             current_dataframe = data
@@ -616,9 +622,9 @@ class Scraper():
                 pd.to_datetime(current_dataframe['rxtimestamputc'])
             current_dataframe = current_dataframe.set_index('rxtimestamputc')
             axes = current_dataframe['occupancy'].plot(marker='.',
-                                                       alpha=0.5, 
+                                                       alpha=0.5,
                                                        figsize=(12, 18),
-                                                       linewidth=1, 
+                                                       linewidth=1,
                                                        markersize=2.5)
 
         try:
@@ -650,7 +656,7 @@ class Scraper():
         sensor_numbers: int/list of ints
             Single number or list. Use:
             'chosen_numbers, chosen_names = \
-                choose_by_number(self.sensor_location_info)'
+                _choose_by_number(self.sensor_location_info)'
             to get corresponding numbers.
 
         sensor_reading_after_data: list dataframes.
@@ -684,23 +690,23 @@ class Scraper():
             if not any(data):
                 print('Sensor number {}: {}. NO DATA RETURNED'
                       .format(sensor_number,
-                              self.sensor_location_info['name']\
+                              self.sensor_location_info['name']
                                   .loc[sensor_number]))
                 continue
             else:
                 print('Sensor number {}: {}. Data Available. Plotting chart.'
                       .format(sensor_number,
-                              self.sensor_location_info['name']\
+                              self.sensor_location_info['name']
                                   .loc[sensor_number]))
                 # this section to obtain plot
                 if labels_done == 0:
                     param_labels = ['occupancy', 'voc', 'co2', 'temperature',
                                     'pressure', 'humid', 'lux', 'noise']
 
-                    plot_labels = ['Occupancy\n(n)', 'VOC\n(ppm?)', 
-                                   'CO2\n(ppm?)', 'Temperature\n(°C)', 
-                                   'Pressure\n(mBar)', 'Humidity\n(RH)', 
-                                   'Light Intensity\n(lux)', 
+                    plot_labels = ['Occupancy\n(n)', 'VOC\n(ppm?)',
+                                   'CO2\n(ppm?)', 'Temperature\n(°C)',
+                                   'Pressure\n(mBar)', 'Humidity\n(RH)',
+                                   'Light Intensity\n(lux)',
                                    'Noise Levels\n(dB)']
 
                 current_dataframe = data
@@ -711,9 +717,9 @@ class Scraper():
 
                 plot_title = str('Sensor readings (after) from sensor number '
                                  '{}: {}.'.format(sensor_number,
-                                         self.sensor_location_info['name']\
-                                             .loc[sensor_number]))
-                axes = current_dataframe[param_labels].plot(marker='.', 
+                                                  self.sensor_location_info['name']
+                                                  .loc[sensor_number]))
+                axes = current_dataframe[param_labels].plot(marker='.',
                                                             alpha=0.5,
                                                             figsize=(12, 26),
                                                             subplots=True,
@@ -802,10 +808,9 @@ class Scraper():
             print("{} {}: {}.".format(list_description, number, name))
 
         chosen_numbers = input(
-            'Choose by number. Use the format:\n \'1\' for single, '
-            '\'1, 2, 3\' for multiple, or press enter for all.\n Use '
-            '\'range()\' to return a list (e.g.\'range(3,6)\' returns '
-            '\'3,4,5\'):\n>>')
+            'Choose by number. Use the format:\n \'1\' for single, \'1, 2, 3\''
+            'for multiple, or press enter for all.\n Use \'range()\' to return'
+            ' a list (e.g.\'range(3,6)\' returns \'3,4,5\'):\n>>')
 
         if not chosen_numbers:
             chosen_numbers = list_of_numbers

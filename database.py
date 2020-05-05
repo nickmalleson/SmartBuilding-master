@@ -16,7 +16,6 @@ running the following on the command line:
 
 import sqlite3
 from scraper import Scraper
-import os
 import pandas as pd
 import argparse
 
@@ -34,12 +33,6 @@ class Database():
 
     @staticmethod
     def _connect_to_database():
-        # TODO: DODGY USE OF GLOBAL VARIABLES WHILST TESTING. NEEDS SORTING OUT
-        # Connect to the database (creates a Connection object)
-        # global conn, c
-
-        # global conn, c
-
         # connect to database
         conn = sqlite3.connect("./database.db")
 
@@ -104,7 +97,7 @@ class Database():
         else:
             return(0)
 
-    # %% Some functions
+    # %% functions for getting and inserting data
 
     def insert_sensor_readings_latest(self, sensor_reading_latest_data):
         ''' Tries to insert data from the API in to the database using output 
@@ -306,6 +299,4 @@ if __name__ == '__main__':
 
     finally:
         # Whatever happens, try to commit data to database and close up 
-        # (unnecessary because this will happen automatically when the 
-        # program finishes?)
         del database

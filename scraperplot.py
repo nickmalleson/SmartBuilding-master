@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-scraperlot.py
+scraperplot.py
 
 For retreiving and plotting data using the 'scraper.py' module.
 
