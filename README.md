@@ -47,11 +47,11 @@ Or the most recent sensor readings using:
 
 'database.db' must be created using sqlite3. Install sqlite3. Then, from the command line, enter:
 
-    sqlite3 TARGET_DIRECTORY\database.db < PATH_TO_FILE\create_database.sql
+    sqlite3 TARGET_DIRECTORY\database.db < TARGET_DIRECTORY\create_database.sql
 
-Replace TARGET_DIRECTORY and PATH_TO_FILE the directory containing 'create_database.sql'.
+Replace TARGET_DIRECTORY with the directory containing 'create_database.sql'.
 
-You can then use 'database.py' to insert data into the empty 'database.db', using 'scraper.py' to collect the data. Depending on the flags when the file is run, you can populate the database from the time the sensors were turned on, from a specific time point, or just add the most recent readings.
+You can then use 'database.py' to insert data into the empty 'database.db', using 'scraper.py' to collect the data. Depending on the flags you input when the file is run, you can populate the database from the time the sensors were turned on, from a specific time point, or just add the most recent readings.
 
 Navigate to the directory containing 'database.db' and database.py.
 To insert all available data enter:
@@ -70,13 +70,13 @@ Replace TIME_IN_MS_EPOCH_FORMAT with the time you want to populate from (e.g.: '
 
 ### Plotting from the database using '[databaseplot.py](./databaseplot.py)'
 
-'databaseplot.py' is a tool for plotting from the database. You can select the sensors you want to plot by sensor number, sensor name, room number, or room name. You can also specify the time period you want to plot, as well as the the parameters. It has arguments for overlaying the data when plotting multiple sensors or rooms, and can overlay all on the same plot, or keep sensors from the same room together. It also has an option to aggregate the data by taking mean of all parameters (except occupancy, which is calculated as sum) from all sensors in a room per minute.
+'databaseplot.py' is a tool for plotting from the database. You can select the sensors you want to plot by sensor number, sensor name, room number, or room name. You can specify the time period and parameters you want to plot. It has arguments for overlaying the data when plotting multiple sensors or rooms, and can overlay all on the same plot, or keep sensors from the same room together. It also has an option to aggregate the data by taking mean of all parameters (except occupancy, which is calculated as sum) from all sensors in a room per minute.
 
 In python, import the plotting function:
 
     from databaseplot import DatabasePlotter
 
-You can then plot using the 'DatabasePlotter()' class and the 'plot_from_database()' function. To plot using the default settings, use the format:
+You can then plot using the 'DatabasePlotter()' class and the 'plot_from_database()' function. By default the function will plot all the available data from all of the sensors. To plot using the default settings, use the format:
 
     DatabasePlotter().plot_from_database()
 
@@ -84,8 +84,7 @@ Specify sensor numbers, or sensor names with the 'sensors' argument:
 
     DatabasePlotter().plot_from_database(sensors = [1, 4, 10, 12])
 
-    DatabasePlotter().plot_from_database(sensors = ['0-Café-1', '0-Exhibition-Area-1', '2-Desks:229-232', 
-    '2-Desks:233-240', '2-Desks:241-244'])
+    DatabasePlotter().plot_from_database(sensors = ['0-Café-1', '0-Exhibition-Area-1', '2-Desks:229-232'])
 
 Specify room numbers or room names with the 'rooms' argument:
     
@@ -93,15 +92,15 @@ Specify room numbers or room names with the 'rooms' argument:
 
     DatabasePlotter().plot_from_database(rooms = ['0-Café', '0-Exhibition-Area', '2-Open-Office']
 
-Other arguments can be set as inputs:
+Other input arguments can also be set or left as default:
 
-        time_from   Default: first available
-        time_to     Default: time now
-        parameters  Default: all ['occupancy', 'voc', 'co2', 'temperature', 'pressure', 'humidity', 'lux', 
-                                  'noise']
-        overlay     Default: 1 - overlay plots from the differnet sensors
-        aggregate   Default: 0 - do not aggregate
-        seperate    Default: 1 - different plots for different rooms
+    time_from   Default: first available
+    time_to     Default: time now
+    parameters  Default: all ['occupancy', 'voc', 'co2', 'temperature', 'pressure', 'humidity', 'lux', 
+                              'noise']
+    overlay     Default: 1 - overlay plots from the differnet sensors
+    aggregate   Default: 0 - do not aggregate
+    seperate    Default: 1 - different plots for different rooms
 
 For example:
 
@@ -110,7 +109,7 @@ For example:
     DatabasePlotter().plot_from_database(rooms=[1,2,3], time_from=1588062521008, parameters=['occupancy', 'noise'], 
     aggregate = 1, overlay = 0)
 
-Unset inputs are set to default.
+Unset inputs are automatically set to default.
 
 You can also plot from the command line using the arguments 'sensors', 'rooms', or 'parameters', depending on what you want to choose from:
 
