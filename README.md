@@ -1,6 +1,6 @@
 # SmartBuilding
 
-This repository is for accessing the API for the Connected Places Catapult 'Smart Building', acquiring data, storing it in a batabase, and plotting. The assumption is made that you are familiar with the Beringar API functions, and the sensors and layout. In the 'docs' folder, you can check 'api v1.6.pdf' for the API documentation, and 'UIC All Floor Plans1.pdf' for the layout of the building. 
+This repository is for accessing the API for the Connected Places Catapult 'Smart Building', acquiring data, storing it in a batabase, and plotting. The assumption is made that you are familiar with the Beringar API functions, and the sensors and layout. In the 'docs' folder, you can check 'api v1.6.pdf' for the API documentation, and 'UIC All Floor Plans1.pdf' for the layout of the building.
 
 '[scraper.py](./scraper.py)' is a module which can be used to login and access the API, and to retreive data for storage in variables. It also includes functions for plotting data.
 
@@ -19,12 +19,14 @@ See '[databaseplot_notebook.ipynb](./databaseplot_notebook.ipynb)' for a demonst
 
 ## Installing and Running
 
-### Initialise and run '[scraper.py](./scraper.py)' 
+### Initialise and run '[scraper.py](./scraper.py)'
 
-The script requires login detail for functions to access the API. IMPORTANT: to log in automatically, place a .txt file named 'SmartBuildingParameters.txt' in a folder named 'SmartBuildingParameters' in this diretory. The file should contain the login details in the following format:
+The script requires login detail for functions to access the API. IMPORTANT: to log in automatically, place a .txt file named 'SmartBuildingParameters.txt' in a directory named 'SmartBuildingParameters'. The file should contain the login details in the following format:
 
-"username = user138
+```
+username = user138
 password = letmein"
+```
 
 In Python, import the module:
 
@@ -36,14 +38,18 @@ You can then assign an instance of the Scraper() class:
 
 Data can then be retrieved from a specific time point using:
 
-    sensor_reading_after, sensor_numbers = scraper_instance.sensor_reading_after(sensor_numbers=list_of_sensor_numbers, 
-    timestamp_epoch_millisec=input_time_in_ms_epoch_format)
+    sensor_reading_after, sensor_numbers =      
+      scraper_instance.sensor_reading_after(
+        sensor_numbers=list_of_sensor_numbers,
+        timestamp_epoch_millisec=input_time_in_ms_epoch_format
+      )
 
 Or the most recent sensor readings using:
 
-    sensor_reading_latest, sensor_numbers = scraper_instance.sensor_reading_latest()
+    sensor_reading_latest, sensor_numbers =
+      scraper_instance.sensor_reading_latest()
 
-### Create 'database.db' and populate it using '[database.py](./database.py)' 
+### Create 'database.db' and populate it using '[database.py](./database.py)'
 
 'database.db' must be created using sqlite3. Install sqlite3. Then, from the command line, enter:
 
@@ -70,7 +76,7 @@ Replace TIME_IN_MS_EPOCH_FORMAT with the time you want to populate from (e.g.: '
 
 ### Plotting from the database using '[databaseplot.py](./databaseplot.py)'
 
-'databaseplot.py' is a tool for plotting from the database. You can select the sensors you want to plot by sensor number, sensor name, room number, or room name. You can specify the time period and parameters you want to plot. It has arguments for overlaying the data when plotting multiple sensors or rooms, and can overlay all on the same plot, or keep sensors from the same room together. It also has an option to aggregate the data by taking mean of all parameters (except occupancy, which is calculated as sum) from all sensors in a room per minute.
+`databaseplot.py` is a tool for plotting from the database. You can select the sensors you want to plot by sensor number, sensor name, room number, or room name. You can specify the time period and parameters you want to plot. It has arguments for overlaying the data when plotting multiple sensors or rooms, and can overlay all on the same plot, or keep sensors from the same room together. It also has an option to aggregate the data by taking mean of all parameters (except occupancy, which is calculated as sum) from all sensors in a room per minute.
 
 In python, import the plotting function:
 
@@ -87,7 +93,7 @@ Specify sensor numbers, or sensor names with the 'sensors' argument:
     DatabasePlotter().plot_from_database(sensors = ['0-Café-1', '0-Exhibition-Area-1', '2-Desks:229-232'])
 
 Specify room numbers or room names with the 'rooms' argument:
-    
+
     DatabasePlotter().plot_from_database(rooms = [1, 2, 3])
 
     DatabasePlotter().plot_from_database(rooms = ['0-Café', '0-Exhibition-Area', '2-Open-Office']
@@ -96,7 +102,7 @@ Other input arguments can also be set or left as default:
 
     time_from   Default: first available
     time_to     Default: time now
-    parameters  Default: all ['occupancy', 'voc', 'co2', 'temperature', 'pressure', 'humidity', 'lux', 
+    parameters  Default: all ['occupancy', 'voc', 'co2', 'temperature', 'pressure', 'humidity', 'lux',
                               'noise']
     overlay     Default: 1 - overlay plots from the differnet sensors
     aggregate   Default: 0 - do not aggregate
@@ -106,7 +112,7 @@ For example:
 
     time_from = Scraper._time_now() - 604800000 # previous 24 hours
 
-    DatabasePlotter().plot_from_database(rooms=[1,2,3], time_from=1588062521008, parameters=['occupancy', 'noise'], 
+    DatabasePlotter().plot_from_database(rooms=[1,2,3], time_from=1588062521008, parameters=['occupancy', 'noise'],
     aggregate = 1, overlay = 0)
 
 Unset inputs are automatically set to default.
